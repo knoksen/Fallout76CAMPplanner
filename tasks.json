@@ -1,0 +1,39 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "FO76: Clean",
+      "type": "shell",
+      "command": "dotnet clean .\\FO76CampPlanner.csproj"
+    },
+    {
+      "label": "FO76: Restore",
+      "type": "shell",
+      "command": "dotnet restore .\\FO76CampPlanner.csproj"
+    },
+    {
+      "label": "FO76: Build Release",
+      "type": "shell",
+      "command": "dotnet build .\\FO76CampPlanner.csproj -c Release",
+      "dependsOn": ["FO76: Restore"],
+      "problemMatcher": "$msCompile"
+    },
+    {
+      "label": "FO76: Publish Win10 EXE",
+      "type": "shell",
+      "command": "powershell -ExecutionPolicy Bypass -File .\\BUILD_AND_PUBLISH_v10.ps1",
+      "dependsOn": ["FO76: Build Release"],
+      "problemMatcher": "$msCompile",
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      }
+    },
+    {
+      "label": "FO76: Run Published EXE",
+      "type": "shell",
+      "command": ".\\bin\\Release\\net8.0-windows\\win-x64\\publish\\FO76CampPlanner.exe",
+      "dependsOn": ["FO76: Publish Win10 EXE"]
+    }
+  ]
+}

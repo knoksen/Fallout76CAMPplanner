@@ -1,0 +1,31 @@
+{
+  "name": "Missile Silo Control Draft",
+  "presetId": "missile-silo",
+  "mode": 1,
+  "ruleProfile": 2,
+  "budgetLimit": 1500,
+  "storedBudget": 100,
+  "gridWidth": 56,
+  "gridHeight": 32,
+  "cellSize": 48,
+  "layerVisibility": {
+    "structure": true,
+    "utility": true,
+    "defense": true,
+    "power": true,
+    "aesthetic": true,
+    "commerce": true
+  },
+  "items": [
+    { "id": "6a8f9f3a-1111-4444-9a4d-92624812eb21", "definitionId": "foundation", "x": 20, "y": 12, "rotation": 0, "note": "Core" },
+    { "id": "6a8f9f3a-2222-4444-9a4d-92624812eb21", "definitionId": "foundation", "x": 21, "y": 12, "rotation": 0, "note": "Core" },
+    { "id": "6a8f9f3a-3333-4444-9a4d-92624812eb21", "definitionId": "foundation", "x": 22, "y": 12, "rotation": 0, "note": "Core" },
+    { "id": "6a8f9f3a-4444-4444-9a4d-92624812eb21", "definitionId": "foundation", "x": 20, "y": 13, "rotation": 0, "note": "Core" },
+    { "id": "6a8f9f3a-5555-4444-9a4d-92624812eb21", "definitionId": "foundation", "x": 21, "y": 13, "rotation": 0, "note": "Core" },
+    { "id": "6a8f9f3a-6666-4444-9a4d-92624812eb21", "definitionId": "foundation", "x": 22, "y": 13, "rotation": 0, "note": "Core" },
+    { "id": "6a8f9f3a-7777-4444-9a4d-92624812eb21", "definitionId": "power", "x": 24, "y": 12, "rotation": 0, "note": "Control power" },
+    { "id": "6a8f9f3a-8888-4444-9a4d-92624812eb21", "definitionId": "light", "x": 24, "y": 13, "rotation": 0, "note": "Guide light" },
+    { "id": "6a8f9f3a-9999-4444-9a4d-92624812eb21", "definitionId": "decor", "x": 18, "y": 12, "rotation": 0, "note": "Command decor" },
+    { "id": "6a8f9f3a-aaaa-4444-9a4d-92624812eb21", "definitionId": "workbench", "x": 25, "y": 13, "rotation": 0, "note": "Bench wall" }
+  ]
+}

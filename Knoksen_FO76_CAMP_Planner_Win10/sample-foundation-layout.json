@@ -1,0 +1,37 @@
+{
+  "name": "Knoksen Foundation Draft",
+  "presetId": "nuke-camp",
+  "mode": 0,
+  "ruleProfile": 1,
+  "budgetLimit": 1100,
+  "storedBudget": 40,
+  "gridWidth": 36,
+  "gridHeight": 26,
+  "cellSize": 48,
+  "layerVisibility": {
+    "structure": true,
+    "utility": true,
+    "defense": true,
+    "power": true,
+    "aesthetic": true,
+    "commerce": true
+  },
+  "items": [
+    { "id": "cdb5c020-10ef-41b3-a18a-027cdd98e0d1", "definitionId": "foundation", "x": 8, "y": 8, "rotation": 0, "note": "Foundation" },
+    { "id": "be2ea5c6-49f6-4bb1-b111-6f1c193c6d0a", "definitionId": "foundation", "x": 9, "y": 8, "rotation": 0, "note": "Foundation" },
+    { "id": "9775de33-77ae-4571-ad6e-9420bf9f1a13", "definitionId": "foundation", "x": 10, "y": 8, "rotation": 0, "note": "Foundation" },
+    { "id": "fd17fe23-cc5b-4332-8504-c7d3ca6aa628", "definitionId": "foundation", "x": 11, "y": 8, "rotation": 0, "note": "Foundation" },
+    { "id": "71470d30-6909-4e21-82e1-fe15ec3aaf20", "definitionId": "foundation", "x": 8, "y": 9, "rotation": 0, "note": "Foundation" },
+    { "id": "2f17a7a2-242e-4a64-9eb0-995dd0a15f2b", "definitionId": "foundation", "x": 11, "y": 9, "rotation": 0, "note": "Foundation" },
+    { "id": "c8e6bf4b-abcb-4ebd-b295-bc20186b7e51", "definitionId": "foundation", "x": 8, "y": 10, "rotation": 0, "note": "Foundation" },
+    { "id": "db48ccfd-c266-4ebe-a09b-f39dd1b0bc2f", "definitionId": "foundation", "x": 9, "y": 10, "rotation": 0, "note": "Foundation" },
+    { "id": "3c249bb8-fc24-4d3b-90a2-d9889450b1f2", "definitionId": "foundation", "x": 10, "y": 10, "rotation": 0, "note": "Foundation" },
+    { "id": "67d9f8ff-f06d-446c-a675-454f4639f29a", "definitionId": "foundation", "x": 11, "y": 10, "rotation": 0, "note": "Foundation" },
+    { "id": "9c6d7bbf-15f5-47be-9ff0-bfaebd071f87", "definitionId": "door", "x": 9, "y": 8, "rotation": 0, "note": "Front Entry" },
+    { "id": "3c5bf796-7a90-4a88-8f8e-cf2468d2be90", "definitionId": "stairs", "x": 10, "y": 11, "rotation": 0, "note": "Stairs" },
+    { "id": "78a63cab-12af-4bf4-b1e9-fd48473f35a2", "definitionId": "workbench", "x": 9, "y": 9, "rotation": 0, "note": "Workbench" },
+    { "id": "e32508a3-96af-4f26-af92-4b0b36d93177", "definitionId": "power", "x": 8, "y": 8, "rotation": 0, "note": "Power" },
+    { "id": "67dcf71d-ed93-4a9a-a874-92624812eb6a", "definitionId": "turret", "x": 11, "y": 10, "rotation": 0, "note": "Turret" },
+    { "id": "130d7f4d-ed93-4a9a-a874-92624812eb11", "definitionId": "vendor", "x": 13, "y": 9, "rotation": 0, "note": "Vendor lane" }
+  ]
+}

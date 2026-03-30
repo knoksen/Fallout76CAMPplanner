@@ -1,0 +1,1661 @@
+using System.Text.Json;
+
+namespace FO76CampPlanner;
+
+public sealed class MainForm : Form
+{
+    private readonly PlannerCanvas _canvas = new();
+    private readonly ListBox _itemList = new();
+    private readonly Label _selectionLabel = new();
+    private readonly Label _modeLabel = new();
+    private readonly Label _budgetLabel = new();
+    private readonly Label _presetDescriptionLabel = new();
+    private readonly Label _historyLabel = new();
+    private readonly Label _blueprintLabel = new();
+    private readonly Label _analysisLabel = new();
+    private readonly Label _workflowLabel = new();
+    private readonly Label _focusLabel = new();
+    private readonly Label _overviewHeroLabel = new();
+    private readonly Label _overviewMetaLabel = new();
+    private readonly Label _statusCardLabel = new();
+    private readonly ProgressBar _budgetProgress = new();
+    private readonly NumericUpDown _budgetLimitInput = new();
+    private readonly NumericUpDown _storedBudgetInput = new();
+    private readonly NumericUpDown _gridWidthInput = new();
+    private readonly NumericUpDown _gridHeightInput = new();
+    private readonly NumericUpDown _zoomInput = new();
+    private readonly ComboBox _modeCombo = new();
+    private readonly ComboBox _ruleCombo = new();
+    private readonly ComboBox _presetCombo = new();
+    private readonly ComboBox _itemLayerFilterCombo = new();
+    private readonly TextBox _projectNameText = new();
+    private readonly TextBox _itemFilterText = new();
+    private readonly StatusStrip _statusStrip = new();
+    private readonly ToolStripStatusLabel _statusLabel = new("Ready.");
+    private readonly Dictionary<ToolType, ToolStripButton> _toolButtons = new();
+    private readonly Dictionary<LayerType, CheckBox> _layerChecks = new();
+    private readonly Dictionary<LayerType, CheckBox> _layerLockChecks = new();
+    private readonly Dictionary<string, Button> _workflowButtons = new();
+
+    private ToolStripButton? _undoButton;
+    private ToolStripButton? _redoButton;
+    private CheckBox? _showCampRadiusCheck;
+    private CheckBox? _showTurretCoverageCheck;
+    private string? _currentPath;
+    private bool _suppressUiEvents;
+
+    private static readonly Color BgApp = Color.FromArgb(18, 22, 28);
+    private static readonly Color BgPanel = Color.FromArgb(27, 33, 41);
+    private static readonly Color BgCard = Color.FromArgb(34, 40, 49);
+    private static readonly Color BgCanvasFrame = Color.FromArgb(21, 26, 33);
+    private static readonly Color Accent = Color.FromArgb(246, 188, 57);
+    private static readonly Color AccentSoft = Color.FromArgb(76, 246, 188, 57);
+    private static readonly Color TextPrimary = Color.FromArgb(235, 239, 244);
+    private static readonly Color TextSecondary = Color.FromArgb(170, 180, 192);
+    private static readonly Color Border = Color.FromArgb(58, 68, 82);
+
+    public MainForm()
+    {
+        Text = "Knoksen FO76 CAMP Planner - UI/UX Build";
+        MinimumSize = new Size(1420, 920);
+        Width = 1680;
+        Height = 980;
+        StartPosition = FormStartPosition.CenterScreen;
+        BackColor = BgApp;
+        ForeColor = TextPrimary;
+        Font = new Font("Segoe UI", 9f);
+
+        BuildUi();
+        WireEvents();
+        ApplyTheme(this);
+        NewProject();
+    }
+
+    private void BuildUi()
+    {
+        var mainContainer = new SplitContainer
+        {
+            Dock = DockStyle.Fill,
+            SplitterDistance = 1120,
+            BackColor = BgApp,
+            ForeColor = TextPrimary,
+            FixedPanel = FixedPanel.Panel2,
+            IsSplitterFixed = false,
+            SplitterWidth = 8,
+            Panel1MinSize = 900,
+            Panel2MinSize = 360
+        };
+
+        var leftLayout = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            ColumnCount = 1,
+            RowCount = 3,
+            BackColor = BgApp,
+            Margin = new Padding(0),
+            Padding = new Padding(0)
+        };
+        leftLayout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        leftLayout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        leftLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100f));
+
+        leftLayout.Controls.Add(BuildTopHeader(), 0, 0);
+        leftLayout.Controls.Add(BuildToolStrip(), 0, 1);
+
+        var canvasPanel = new Panel
+        {
+            Dock = DockStyle.Fill,
+            Padding = new Padding(10, 10, 10, 8),
+            BackColor = BgApp
+        };
+        var canvasFrame = BuildCardPanel();
+        canvasFrame.Padding = new Padding(10);
+        canvasFrame.Dock = DockStyle.Fill;
+        canvasFrame.BackColor = BgCanvasFrame;
+        canvasFrame.Controls.Add(_canvas);
+        canvasPanel.Controls.Add(canvasFrame);
+        leftLayout.Controls.Add(canvasPanel, 0, 2);
+
+        mainContainer.Panel1.Controls.Add(leftLayout);
+        mainContainer.Panel2.Controls.Add(BuildRightPanel());
+
+        _statusStrip.BackColor = BgPanel;
+        _statusStrip.ForeColor = TextSecondary;
+        _statusStrip.SizingGrip = false;
+        _statusStrip.Items.Add(_statusLabel);
+
+        Controls.Add(mainContainer);
+        Controls.Add(_statusStrip);
+    }
+
+    private Control BuildTopHeader()
+    {
+        var shell = new Panel
+        {
+            Dock = DockStyle.Top,
+            Height = 132,
+            Padding = new Padding(10, 10, 10, 0),
+            BackColor = BgApp
+        };
+
+        var card = BuildCardPanel();
+        card.Height = 118;
+        card.Dock = DockStyle.Top;
+        card.Padding = new Padding(16, 12, 16, 12);
+
+        _overviewHeroLabel.Text = "CAMP Planner";
+        _overviewHeroLabel.Font = new Font("Segoe UI Semibold", 17f, FontStyle.Bold);
+        _overviewHeroLabel.AutoSize = true;
+        _overviewHeroLabel.ForeColor = TextPrimary;
+        _overviewHeroLabel.Location = new Point(12, 10);
+
+        _overviewMetaLabel.Text = "Foundation-first design for Fallout 76";
+        _overviewMetaLabel.Font = new Font("Segoe UI", 9.5f, FontStyle.Regular);
+        _overviewMetaLabel.AutoSize = true;
+        _overviewMetaLabel.ForeColor = TextSecondary;
+        _overviewMetaLabel.Location = new Point(14, 44);
+
+        _statusCardLabel.Text = "Strict layout discipline • CAMP/Shelter-aware • Blueprint-ready";
+        _statusCardLabel.AutoSize = false;
+        _statusCardLabel.TextAlign = ContentAlignment.MiddleRight;
+        _statusCardLabel.ForeColor = Accent;
+        _statusCardLabel.Font = new Font("Segoe UI Semibold", 9f, FontStyle.Bold);
+        _statusCardLabel.Dock = DockStyle.Right;
+        _statusCardLabel.Width = 410;
+
+        var workflowBar = BuildWorkflowHeaderBar();
+        workflowBar.Location = new Point(12, 72);
+
+        card.Controls.Add(_overviewHeroLabel);
+        card.Controls.Add(_overviewMetaLabel);
+        card.Controls.Add(_statusCardLabel);
+        card.Controls.Add(workflowBar);
+        shell.Controls.Add(card);
+        return shell;
+    }
+
+    private Control BuildToolStrip()
+    {
+        var host = new Panel
+        {
+            Dock = DockStyle.Top,
+            Height = 108,
+            Padding = new Padding(10, 0, 10, 0),
+            BackColor = BgApp
+        };
+
+        var strip = new ToolStrip
+        {
+            Dock = DockStyle.Top,
+            GripStyle = ToolStripGripStyle.Hidden,
+            RenderMode = ToolStripRenderMode.System,
+            Padding = new Padding(8),
+            AutoSize = false,
+            Height = 98,
+            BackColor = BgPanel,
+            ForeColor = TextPrimary,
+            CanOverflow = true,
+            LayoutStyle = ToolStripLayoutStyle.HorizontalStackWithOverflow
+        };
+
+        var newBtn = BuildToolAction("New", (_, _) => NewProject());
+        var openBtn = BuildToolAction("Open", (_, _) => OpenProject());
+        var saveBtn = BuildToolAction("Save", (_, _) => SaveProject(false));
+        var saveAsBtn = BuildToolAction("Save As", (_, _) => SaveProject(true));
+        var exportBtn = BuildToolAction("Export PNG", (_, _) => ExportPng());
+        var rotateBtn = BuildToolAction("Rotate", (_, _) => _canvas.RotateSelected(), "Rotate selection (R)");
+        var pasteBlueprintBtn = BuildToolAction("Paste Blueprint", (_, _) => _canvas.PasteLoadedBlueprint());
+
+        _undoButton = BuildToolAction("Undo", (_, _) => _canvas.Undo(), "Undo (Ctrl+Z)");
+        _undoButton.Enabled = false;
+        _redoButton = BuildToolAction("Redo", (_, _) => _canvas.Redo(), "Redo (Ctrl+Y)");
+        _redoButton.Enabled = false;
+
+        strip.Items.AddRange(new ToolStripItem[]
+        {
+            newBtn, openBtn, saveBtn, saveAsBtn, new ToolStripSeparator(),
+            exportBtn, rotateBtn, pasteBlueprintBtn, _undoButton, _redoButton, new ToolStripSeparator()
+        });
+
+        AddToolButton(strip, ToolType.Select, "Select", "Select / move / multiselect");
+        AddToolButton(strip, ToolType.Foundation, "Foundation", "Foundation cell");
+        AddToolButton(strip, ToolType.Wall, "Wall", "Snap to foundation edge");
+        AddToolButton(strip, ToolType.Door, "Door", "Snap to foundation edge");
+        AddToolButton(strip, ToolType.Stairs, "Stairs", "Snap to open edge");
+        AddToolButton(strip, ToolType.Roof, "Roof", "Snap to supported foundation");
+        AddToolButton(strip, ToolType.Workbench, "Workbench", "Utility object");
+        AddToolButton(strip, ToolType.Turret, "Turret", "Defense coverage preview");
+        AddToolButton(strip, ToolType.Power, "Power", "Generators / power nodes");
+        AddToolButton(strip, ToolType.Light, "Light", "Lighting layer");
+        AddToolButton(strip, ToolType.Decor, "Decor", "Aesthetic object");
+        AddToolButton(strip, ToolType.Vendor, "Vendor", "Commerce object");
+        AddToolButton(strip, ToolType.Resource, "Resource", "Resource object");
+        AddToolButton(strip, ToolType.Display, "Display", "Display object");
+        AddToolButton(strip, ToolType.Ally, "Ally", "Ally station");
+        AddToolButton(strip, ToolType.Erase, "Erase", "Delete clicked object");
+
+        host.Controls.Add(strip);
+        return host;
+    }
+
+    private ToolStripButton BuildToolAction(string text, EventHandler click, string? tooltip = null)
+    {
+        var button = new ToolStripButton(text)
+        {
+            DisplayStyle = ToolStripItemDisplayStyle.Text,
+            AutoSize = false,
+            Width = text.Length > 10 ? 112 : 86,
+            Height = 32,
+            Margin = new Padding(2, 2, 2, 6),
+            BackColor = BgCard,
+            ForeColor = TextPrimary,
+            ToolTipText = tooltip ?? text
+        };
+        button.Click += click;
+        return button;
+    }
+
+    private void AddToolButton(ToolStrip strip, ToolType tool, string text, string tooltip)
+    {
+        var button = new ToolStripButton(text)
+        {
+            CheckOnClick = true,
+            Tag = tool,
+            ToolTipText = tooltip,
+            DisplayStyle = ToolStripItemDisplayStyle.Text,
+            AutoSize = false,
+            Width = text.Length > 9 ? 92 : 74,
+            Height = 32,
+            Margin = new Padding(2, 2, 2, 6),
+            BackColor = BgCard,
+            ForeColor = TextPrimary
+        };
+
+        button.Click += (_, _) => SetActiveTool(tool);
+        _toolButtons[tool] = button;
+        strip.Items.Add(button);
+    }
+
+    private Control BuildRightPanel()
+    {
+        var panel = new Panel
+        {
+            Dock = DockStyle.Fill,
+            Padding = new Padding(10),
+            BackColor = BgApp
+        };
+
+        var tabs = new TabControl
+        {
+            Dock = DockStyle.Fill,
+            DrawMode = TabDrawMode.OwnerDrawFixed,
+            SizeMode = TabSizeMode.Fixed,
+            ItemSize = new Size(88, 30),
+            Padding = new Point(18, 6),
+            Appearance = TabAppearance.Normal
+        };
+        tabs.DrawItem += DrawTab;
+
+        var overviewPage = MakeTabPage("Overview");
+        var buildPage = MakeTabPage("Build");
+        var libraryPage = MakeTabPage("Library");
+        var inspectPage = MakeTabPage("Inspect");
+
+        overviewPage.Controls.Add(BuildOverviewTab());
+        buildPage.Controls.Add(BuildBuildTab());
+        libraryPage.Controls.Add(BuildLibraryTab());
+        inspectPage.Controls.Add(BuildInspectTab());
+
+        tabs.TabPages.Add(overviewPage);
+        tabs.TabPages.Add(buildPage);
+        tabs.TabPages.Add(libraryPage);
+        tabs.TabPages.Add(inspectPage);
+
+        panel.Controls.Add(tabs);
+        return panel;
+    }
+
+    private TabPage MakeTabPage(string text)
+        => new()
+        {
+            Text = text,
+            BackColor = BgApp,
+            ForeColor = TextPrimary,
+            Padding = new Padding(0, 10, 0, 0)
+        };
+
+    private Control BuildOverviewTab()
+    {
+        var layout = BuildTabLayout();
+        layout.Controls.Add(MakeSection("Project", BuildProjectSection()), 0, 0);
+        layout.Controls.Add(MakeSection("Preset", BuildPresetSection()), 0, 1);
+        layout.Controls.Add(MakeSection("Budget", BuildBudgetSection()), 0, 2);
+        layout.Controls.Add(MakeSection("Workflow", BuildWorkflowSection()), 0, 3);
+        layout.Controls.Add(MakeSection("Focus", BuildFocusSection()), 0, 4);
+        layout.Controls.Add(MakeSection("Analysis", BuildAnalysisSection()), 0, 5);
+        layout.Controls.Add(MakeSection("Notes", BuildNotesSection()), 0, 6);
+        return layout;
+    }
+
+    private Control BuildBuildTab()
+    {
+        var layout = BuildTabLayout();
+        layout.Controls.Add(MakeSection("Mode & Rules", BuildRulesSection()), 0, 0);
+        layout.Controls.Add(MakeSection("Workflow", BuildWorkflowSection()), 0, 1);
+        layout.Controls.Add(MakeSection("Grid", BuildGridSection()), 0, 2);
+        layout.Controls.Add(MakeSection("Focus", BuildFocusSection()), 0, 3);
+        layout.Controls.Add(MakeSection("Layers", BuildLayersSection()), 0, 4);
+        return layout;
+    }
+
+    private Control BuildLibraryTab()
+    {
+        var layout = BuildTabLayout();
+        layout.Controls.Add(MakeSection("Blueprints", BuildBlueprintSection()), 0, 0);
+        layout.Controls.Add(MakeSection("Placed Items", BuildItemsSection()), 0, 1);
+        return layout;
+    }
+
+    private Control BuildInspectTab()
+    {
+        var layout = BuildTabLayout();
+        layout.Controls.Add(MakeSection("Selection", BuildSelectionSection()), 0, 0);
+        return layout;
+    }
+
+    private static TableLayoutPanel BuildTabLayout()
+    {
+        var layout = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            ColumnCount = 1,
+            AutoScroll = true,
+            BackColor = BgApp,
+            Padding = new Padding(0, 0, 0, 20)
+        };
+        layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
+        return layout;
+    }
+
+
+    private Control BuildWorkflowHeaderBar()
+    {
+        var flow = new FlowLayoutPanel
+        {
+            AutoSize = true,
+            WrapContents = false,
+            FlowDirection = FlowDirection.LeftToRight,
+            BackColor = Color.Transparent,
+            Margin = new Padding(0)
+        };
+
+        foreach (var stage in new[] { "Layout", "Envelope", "Systems", "Defense", "Polish" })
+        {
+            var button = new Button
+            {
+                Text = stage,
+                Width = 94,
+                Height = 28,
+                BackColor = BgCard,
+                ForeColor = TextPrimary,
+                FlatStyle = FlatStyle.Flat,
+                Margin = new Padding(0, 0, 6, 0),
+                Tag = stage
+            };
+            button.FlatAppearance.BorderSize = 1;
+            button.FlatAppearance.BorderColor = Border;
+            button.Click += (_, _) => ActivateWorkflowStage(stage);
+            _workflowButtons[stage] = button;
+            flow.Controls.Add(button);
+        }
+
+        return flow;
+    }
+
+    private Control BuildWorkflowSection()
+    {
+        var flow = BuildVerticalFlow();
+        _workflowLabel.AutoSize = true;
+        _workflowLabel.MaximumSize = new Size(300, 0);
+        _workflowLabel.ForeColor = TextSecondary;
+
+        var buttonRow1 = new FlowLayoutPanel
+        {
+            AutoSize = true,
+            WrapContents = false,
+            FlowDirection = FlowDirection.LeftToRight,
+            Margin = new Padding(0, 6, 0, 0),
+            BackColor = Color.Transparent
+        };
+        buttonRow1.Controls.Add(BuildGhostButton("1. Layout", (_, _) => ActivateWorkflowStage("Layout")));
+        buttonRow1.Controls.Add(BuildGhostButton("2. Envelope", (_, _) => ActivateWorkflowStage("Envelope")));
+
+        var buttonRow2 = new FlowLayoutPanel
+        {
+            AutoSize = true,
+            WrapContents = false,
+            FlowDirection = FlowDirection.LeftToRight,
+            Margin = new Padding(0, 6, 0, 0),
+            BackColor = Color.Transparent
+        };
+        buttonRow2.Controls.Add(BuildGhostButton("3. Systems", (_, _) => ActivateWorkflowStage("Systems")));
+        buttonRow2.Controls.Add(BuildGhostButton("4. Defense", (_, _) => ActivateWorkflowStage("Defense")));
+
+        var buttonRow3 = new FlowLayoutPanel
+        {
+            AutoSize = true,
+            WrapContents = false,
+            FlowDirection = FlowDirection.LeftToRight,
+            Margin = new Padding(0, 6, 0, 0),
+            BackColor = Color.Transparent
+        };
+        buttonRow3.Controls.Add(BuildActionButton("5. Polish / Presentation", (_, _) => ActivateWorkflowStage("Polish"), true));
+
+        flow.Controls.Add(BuildInfoPill(_workflowLabel));
+        flow.Controls.Add(buttonRow1);
+        flow.Controls.Add(buttonRow2);
+        flow.Controls.Add(buttonRow3);
+        return flow;
+    }
+
+    private Control BuildFocusSection()
+    {
+        var flow = BuildVerticalFlow();
+        _focusLabel.AutoSize = true;
+        _focusLabel.MaximumSize = new Size(300, 0);
+        _focusLabel.ForeColor = TextSecondary;
+
+        var row1 = new FlowLayoutPanel
+        {
+            AutoSize = true,
+            WrapContents = false,
+            FlowDirection = FlowDirection.LeftToRight,
+            Margin = new Padding(0, 6, 0, 0),
+            BackColor = Color.Transparent
+        };
+        row1.Controls.Add(BuildGhostButton("All layers", (_, _) => ApplyFocusPreset("All")));
+        row1.Controls.Add(BuildGhostButton("Structure", (_, _) => ApplyFocusPreset("Structure")));
+
+        var row2 = new FlowLayoutPanel
+        {
+            AutoSize = true,
+            WrapContents = false,
+            FlowDirection = FlowDirection.LeftToRight,
+            Margin = new Padding(0, 6, 0, 0),
+            BackColor = Color.Transparent
+        };
+        row2.Controls.Add(BuildGhostButton("Systems", (_, _) => ApplyFocusPreset("Systems")));
+        row2.Controls.Add(BuildGhostButton("Defense", (_, _) => ApplyFocusPreset("Defense")));
+
+        var row3 = new FlowLayoutPanel
+        {
+            AutoSize = true,
+            WrapContents = false,
+            FlowDirection = FlowDirection.LeftToRight,
+            Margin = new Padding(0, 6, 0, 0),
+            BackColor = Color.Transparent
+        };
+        row3.Controls.Add(BuildActionButton("Presentation view", (_, _) => ApplyFocusPreset("Presentation"), true));
+
+        flow.Controls.Add(BuildInfoPill(_focusLabel));
+        flow.Controls.Add(row1);
+        flow.Controls.Add(row2);
+        flow.Controls.Add(row3);
+        return flow;
+    }
+
+    private Control BuildProjectSection()
+    {
+        var flow = BuildVerticalFlow();
+        _projectNameText.Width = 300;
+        _projectNameText.PlaceholderText = "Project name";
+        flow.Controls.Add(MakeLabel("Project name"));
+        flow.Controls.Add(_projectNameText);
+        flow.Controls.Add(BuildInfoPill(_historyLabel));
+        return flow;
+    }
+
+    private Control BuildPresetSection()
+    {
+        var flow = BuildVerticalFlow();
+        _presetCombo.Width = 300;
+        _presetCombo.DropDownStyle = ComboBoxStyle.DropDownList;
+        _presetCombo.DataSource = PresetLibrary.All.ToList();
+        _presetCombo.DisplayMember = nameof(ProjectPreset.Name);
+        _presetCombo.ValueMember = nameof(ProjectPreset.Id);
+
+        _presetDescriptionLabel.AutoSize = true;
+        _presetDescriptionLabel.MaximumSize = new Size(300, 0);
+        _presetDescriptionLabel.ForeColor = TextSecondary;
+
+        var buttons = new FlowLayoutPanel
+        {
+            AutoSize = true,
+            WrapContents = false,
+            FlowDirection = FlowDirection.LeftToRight,
+            Margin = new Padding(0, 6, 0, 0),
+            BackColor = Color.Transparent
+        };
+        buttons.Controls.Add(BuildActionButton("Apply preset", (_, _) => ApplySelectedPreset(), true));
+        buttons.Controls.Add(BuildGhostButton("New custom", (_, _) => NewProject()));
+
+        flow.Controls.Add(MakeLabel("Choose preset"));
+        flow.Controls.Add(_presetCombo);
+        flow.Controls.Add(_presetDescriptionLabel);
+        flow.Controls.Add(buttons);
+        return flow;
+    }
+
+    private Control BuildRulesSection()
+    {
+        var flow = BuildVerticalFlow();
+        _modeCombo.DropDownStyle = ComboBoxStyle.DropDownList;
+        _modeCombo.Width = 300;
+        _modeCombo.DataSource = Enum.GetValues<BuildMode>();
+
+        _ruleCombo.DropDownStyle = ComboBoxStyle.DropDownList;
+        _ruleCombo.Width = 300;
+        _ruleCombo.DataSource = Enum.GetValues<RuleProfile>();
+
+        _zoomInput.Minimum = 50;
+        _zoomInput.Maximum = 250;
+        _zoomInput.Increment = 10;
+        _zoomInput.Width = 140;
+
+        flow.Controls.Add(MakeLabel("Build mode"));
+        flow.Controls.Add(_modeCombo);
+        flow.Controls.Add(MakeLabel("Rule profile"));
+        flow.Controls.Add(_ruleCombo);
+        flow.Controls.Add(MakeLabel("Zoom %"));
+        flow.Controls.Add(_zoomInput);
+        flow.Controls.Add(BuildInfoPill(_modeLabel));
+        return flow;
+    }
+
+    private Control BuildBudgetSection()
+    {
+        var flow = BuildVerticalFlow();
+
+        _budgetLimitInput.Minimum = 100;
+        _budgetLimitInput.Maximum = 100000;
+        _budgetLimitInput.Increment = 50;
+        _budgetLimitInput.Width = 160;
+
+        _storedBudgetInput.Minimum = 0;
+        _storedBudgetInput.Maximum = 100000;
+        _storedBudgetInput.Increment = 10;
+        _storedBudgetInput.Width = 160;
+
+        _budgetProgress.Width = 300;
+        _budgetProgress.Height = 18;
+        _budgetLabel.AutoSize = true;
+        _budgetLabel.MaximumSize = new Size(300, 0);
+        _budgetLabel.ForeColor = TextSecondary;
+
+        flow.Controls.Add(MakeLabel("Budget limit"));
+        flow.Controls.Add(_budgetLimitInput);
+        flow.Controls.Add(MakeLabel("Stored budget"));
+        flow.Controls.Add(_storedBudgetInput);
+        flow.Controls.Add(_budgetProgress);
+        flow.Controls.Add(_budgetLabel);
+        return flow;
+    }
+
+    private Control BuildGridSection()
+    {
+        var flow = BuildVerticalFlow();
+
+        _gridWidthInput.Minimum = 10;
+        _gridWidthInput.Maximum = 100;
+        _gridWidthInput.Width = 160;
+
+        _gridHeightInput.Minimum = 10;
+        _gridHeightInput.Maximum = 100;
+        _gridHeightInput.Width = 160;
+
+        flow.Controls.Add(MakeLabel("Grid width"));
+        flow.Controls.Add(_gridWidthInput);
+        flow.Controls.Add(MakeLabel("Grid height"));
+        flow.Controls.Add(_gridHeightInput);
+        return flow;
+    }
+
+    private Control BuildAnalysisSection()
+    {
+        var flow = BuildVerticalFlow();
+        _showCampRadiusCheck = BuildCheck("Show CAMP radius overlay", true, (_, _) =>
+        {
+            if (_suppressUiEvents) return;
+            _canvas.Project.ShowCampRadiusOverlay = _showCampRadiusCheck?.Checked ?? true;
+            _canvas.Invalidate();
+            RefreshProjectUi();
+        });
+
+        _showTurretCoverageCheck = BuildCheck("Show turret coverage", true, (_, _) =>
+        {
+            if (_suppressUiEvents) return;
+            _canvas.Project.ShowTurretCoverage = _showTurretCoverageCheck?.Checked ?? true;
+            _canvas.Invalidate();
+            RefreshProjectUi();
+        });
+
+        _analysisLabel.AutoSize = true;
+        _analysisLabel.MaximumSize = new Size(300, 0);
+        _analysisLabel.ForeColor = TextSecondary;
+
+        flow.Controls.Add(_showCampRadiusCheck);
+        flow.Controls.Add(_showTurretCoverageCheck);
+        flow.Controls.Add(BuildInfoPill(_analysisLabel));
+        return flow;
+    }
+
+    private Control BuildLayersSection()
+    {
+        var flow = BuildVerticalFlow();
+        foreach (var layer in Enum.GetValues<LayerType>())
+        {
+            var row = new TableLayoutPanel
+            {
+                ColumnCount = 3,
+                RowCount = 1,
+                Width = 300,
+                Height = 30,
+                Margin = new Padding(0, 2, 0, 2),
+                BackColor = Color.Transparent
+            };
+            row.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 16f));
+            row.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
+            row.ColumnStyles.Add(new ColumnStyle(SizeType.Absolute, 70f));
+
+            var swatch = new Panel
+            {
+                Width = 12,
+                Height = 12,
+                Margin = new Padding(0, 7, 6, 0),
+                BackColor = GetLayerSwatch(layer)
+            };
+
+            var check = new CheckBox
+            {
+                Text = layer.ToString(),
+                AutoSize = true,
+                Checked = true,
+                ForeColor = TextPrimary,
+                BackColor = Color.Transparent,
+                Margin = new Padding(0, 4, 8, 2)
+            };
+            check.CheckedChanged += (_, _) =>
+            {
+                if (_suppressUiEvents) return;
+                _canvas.SetLayerVisibility(layer, check.Checked);
+            };
+
+            var lockCheck = new CheckBox
+            {
+                Text = "Lock",
+                Checked = false,
+                AutoSize = true,
+                ForeColor = Accent,
+                BackColor = Color.Transparent,
+                Margin = new Padding(0, 4, 0, 2)
+            };
+            lockCheck.CheckedChanged += (_, _) =>
+            {
+                if (_suppressUiEvents) return;
+                _canvas.SetLayerLocked(layer, lockCheck.Checked);
+            };
+
+            _layerChecks[layer] = check;
+            _layerLockChecks[layer] = lockCheck;
+            row.Controls.Add(swatch, 0, 0);
+            row.Controls.Add(check, 1, 0);
+            row.Controls.Add(lockCheck, 2, 0);
+            flow.Controls.Add(row);
+        }
+
+        var buttons = new FlowLayoutPanel
+        {
+            AutoSize = true,
+            WrapContents = false,
+            FlowDirection = FlowDirection.LeftToRight,
+            Margin = new Padding(0, 8, 0, 0),
+            BackColor = Color.Transparent
+        };
+        buttons.Controls.Add(BuildGhostButton("Show all", (_, _) => _canvas.ShowAllLayers()));
+        buttons.Controls.Add(BuildGhostButton("Unlock all", (_, _) => _canvas.UnlockAllLayers()));
+        flow.Controls.Add(buttons);
+        return flow;
+    }
+
+    private Control BuildSelectionSection()
+    {
+        var flow = BuildVerticalFlow();
+        _selectionLabel.AutoSize = true;
+        _selectionLabel.MaximumSize = new Size(300, 0);
+        _selectionLabel.Text = "No selection.";
+        _selectionLabel.ForeColor = TextSecondary;
+        flow.Controls.Add(BuildInfoPill(_selectionLabel));
+        return flow;
+    }
+
+    private Control BuildBlueprintSection()
+    {
+        var flow = BuildVerticalFlow();
+        _blueprintLabel.AutoSize = true;
+        _blueprintLabel.MaximumSize = new Size(300, 0);
+        _blueprintLabel.ForeColor = TextSecondary;
+
+        flow.Controls.Add(BuildInfoPill(_blueprintLabel));
+        flow.Controls.Add(BuildActionButton("Save selection as blueprint", (_, _) => SaveSelectionAsBlueprint()));
+        flow.Controls.Add(BuildActionButton("Load blueprint", (_, _) => LoadBlueprint()));
+        flow.Controls.Add(BuildGhostButton("Paste loaded blueprint", (_, _) => _canvas.PasteLoadedBlueprint()));
+        flow.Controls.Add(BuildGhostButton("Clear loaded blueprint", (_, _) => _canvas.ClearLoadedBlueprint()));
+        return flow;
+    }
+
+    private Control BuildItemsSection()
+    {
+        var flow = BuildVerticalFlow();
+
+        _itemFilterText.Width = 300;
+        _itemFilterText.PlaceholderText = "Filter by item name, note, or grid coords";
+
+        _itemLayerFilterCombo.Width = 300;
+        _itemLayerFilterCombo.DropDownStyle = ComboBoxStyle.DropDownList;
+        _itemLayerFilterCombo.Items.Add("All layers");
+        foreach (var layer in Enum.GetValues<LayerType>())
+        {
+            _itemLayerFilterCombo.Items.Add(layer);
+        }
+        _itemLayerFilterCombo.SelectedIndex = 0;
+
+        _itemList.Width = 300;
+        _itemList.Height = 360;
+        _itemList.SelectionMode = SelectionMode.MultiExtended;
+        _itemList.DrawMode = DrawMode.OwnerDrawFixed;
+        _itemList.ItemHeight = 26;
+        _itemList.BorderStyle = BorderStyle.FixedSingle;
+        _itemList.BackColor = BgCard;
+        _itemList.ForeColor = TextPrimary;
+        _itemList.DrawItem += DrawItemEntry;
+
+        flow.Controls.Add(MakeLabel("Search"));
+        flow.Controls.Add(_itemFilterText);
+        flow.Controls.Add(MakeLabel("Layer filter"));
+        flow.Controls.Add(_itemLayerFilterCombo);
+        flow.Controls.Add(_itemList);
+        return flow;
+    }
+
+    private Control BuildNotesSection()
+    {
+        var panel = BuildVerticalFlow();
+        var help = new Label
+        {
+            AutoSize = true,
+            MaximumSize = new Size(300, 0),
+            ForeColor = TextSecondary,
+            Text = "UI/UX refresh: workflow-first sidebar, stage-based building passes, focus presets for layer visibility, clearer project header, searchable placed-items library, and stronger canvas feedback with live placement preview, hover cell and build hints."
+        };
+        panel.Controls.Add(help);
+        return panel;
+    }
+
+    private static FlowLayoutPanel BuildVerticalFlow()
+        => new()
+        {
+            FlowDirection = FlowDirection.TopDown,
+            WrapContents = false,
+            AutoSize = true,
+            Dock = DockStyle.Top,
+            Width = 312,
+            Margin = new Padding(0)
+        };
+
+    private Button BuildActionButton(string text, EventHandler click, bool primary = false)
+    {
+        var button = new Button
+        {
+            Text = text,
+            Width = text.Length > 18 ? 212 : 148,
+            Height = 34,
+            BackColor = primary ? Accent : BgCard,
+            ForeColor = primary ? Color.FromArgb(35, 26, 0) : TextPrimary,
+            FlatStyle = FlatStyle.Flat,
+            Margin = new Padding(0, 6, 0, 0)
+        };
+        button.FlatAppearance.BorderSize = 1;
+        button.FlatAppearance.BorderColor = primary ? Accent : Border;
+        button.Click += click;
+        return button;
+    }
+
+    private Button BuildGhostButton(string text, EventHandler click)
+        => BuildActionButton(text, click, false);
+
+    private CheckBox BuildCheck(string text, bool isChecked, EventHandler click)
+    {
+        var check = new CheckBox
+        {
+            Text = text,
+            Checked = isChecked,
+            AutoSize = true,
+            ForeColor = TextPrimary,
+            BackColor = Color.Transparent,
+            Margin = new Padding(0, 4, 0, 2)
+        };
+        check.CheckedChanged += click;
+        return check;
+    }
+
+    private Control BuildInfoPill(Label label)
+    {
+        var panel = BuildCardPanel();
+        panel.Width = 312;
+        panel.Padding = new Padding(10, 8, 10, 8);
+        panel.Margin = new Padding(0, 6, 0, 0);
+        label.Location = new Point(10, 8);
+        label.AutoSize = true;
+        label.BackColor = Color.Transparent;
+        panel.Controls.Add(label);
+        return panel;
+    }
+
+    private Panel BuildCardPanel()
+    {
+        return new Panel
+        {
+            BackColor = BgPanel,
+            ForeColor = TextPrimary,
+            BorderStyle = BorderStyle.FixedSingle,
+            Margin = new Padding(0, 0, 0, 8)
+        };
+    }
+
+    private Control MakeSection(string title, Control body)
+    {
+        var shell = BuildCardPanel();
+        shell.Dock = DockStyle.Top;
+        shell.AutoSize = true;
+        shell.Padding = new Padding(0);
+        shell.Margin = new Padding(0, 0, 0, 10);
+
+        var header = new Panel
+        {
+            Dock = DockStyle.Top,
+            Height = 34,
+            BackColor = BgCard,
+            Padding = new Padding(12, 8, 12, 0)
+        };
+        var titleLabel = new Label
+        {
+            Text = title,
+            AutoSize = true,
+            ForeColor = TextPrimary,
+            Font = new Font("Segoe UI Semibold", 10f, FontStyle.Bold)
+        };
+        header.Controls.Add(titleLabel);
+
+        body.Dock = DockStyle.Top;
+        body.Padding = new Padding(12, 10, 12, 12);
+        shell.Controls.Add(body);
+        shell.Controls.Add(header);
+        return shell;
+    }
+
+    private Label MakeLabel(string text)
+        => new() { AutoSize = true, Text = text, Margin = new Padding(0, 4, 0, 2), ForeColor = TextSecondary };
+
+    private void ApplyTheme(Control root)
+    {
+        foreach (Control control in root.Controls)
+        {
+            switch (control)
+            {
+                case Panel panel:
+                    panel.ForeColor = TextPrimary;
+                    break;
+                case Label label:
+                    if (label != _overviewHeroLabel)
+                    {
+                        label.ForeColor = label.ForeColor == Color.Empty ? TextPrimary : label.ForeColor;
+                    }
+                    break;
+                case TextBox textBox:
+                    textBox.BackColor = BgCard;
+                    textBox.ForeColor = TextPrimary;
+                    textBox.BorderStyle = BorderStyle.FixedSingle;
+                    break;
+                case ComboBox comboBox:
+                    comboBox.BackColor = BgCard;
+                    comboBox.ForeColor = TextPrimary;
+                    comboBox.FlatStyle = FlatStyle.Flat;
+                    break;
+                case NumericUpDown numeric:
+                    numeric.BackColor = BgCard;
+                    numeric.ForeColor = TextPrimary;
+                    numeric.BorderStyle = BorderStyle.FixedSingle;
+                    break;
+                case ListBox list:
+                    list.BackColor = BgCard;
+                    list.ForeColor = TextPrimary;
+                    break;
+                case TabControl tabControl:
+                    tabControl.BackColor = BgApp;
+                    tabControl.ForeColor = TextPrimary;
+                    break;
+                case Button button:
+                    button.FlatAppearance.MouseOverBackColor = Color.FromArgb(50, 58, 70);
+                    button.FlatAppearance.MouseDownBackColor = Color.FromArgb(44, 50, 60);
+                    break;
+            }
+
+            ApplyTheme(control);
+        }
+    }
+
+    private void DrawTab(object? sender, DrawItemEventArgs e)
+    {
+        if (sender is not TabControl tabs) return;
+        var tab = tabs.TabPages[e.Index];
+        var rect = e.Bounds;
+        var isSelected = (e.State & DrawItemState.Selected) == DrawItemState.Selected;
+        using var back = new SolidBrush(isSelected ? BgCard : BgPanel);
+        using var accentBrush = new SolidBrush(isSelected ? AccentSoft : Color.FromArgb(0, 0, 0, 0));
+        using var textBrush = new SolidBrush(isSelected ? TextPrimary : TextSecondary);
+        using var borderPen = new Pen(isSelected ? Accent : Border, isSelected ? 1.8f : 1f);
+        e.Graphics.FillRectangle(back, rect);
+        if (isSelected)
+        {
+            e.Graphics.FillRectangle(accentBrush, new Rectangle(rect.X + 1, rect.Bottom - 4, rect.Width - 2, 3));
+        }
+        e.Graphics.DrawRectangle(borderPen, Rectangle.Inflate(rect, -1, -1));
+        TextRenderer.DrawText(e.Graphics, tab.Text, Font, rect, textBrush.Color, TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
+    }
+
+    private void DrawItemEntry(object? sender, DrawItemEventArgs e)
+    {
+        e.DrawBackground();
+        if (e.Index < 0 || e.Index >= _itemList.Items.Count)
+        {
+            return;
+        }
+
+        if (_itemList.Items[e.Index] is not ItemListEntry entry || !Catalog.ById.TryGetValue(entry.Item.DefinitionId, out var definition))
+        {
+            return;
+        }
+
+        var selected = (e.State & DrawItemState.Selected) == DrawItemState.Selected;
+        var bg = selected ? Color.FromArgb(56, 66, 82) : BgCard;
+        using var bgBrush = new SolidBrush(bg);
+        using var swatchBrush = new SolidBrush(definition.DisplayColor);
+        using var textBrush = new SolidBrush(TextPrimary);
+        using var mutedBrush = new SolidBrush(TextSecondary);
+        using var borderPen = new Pen(selected ? Accent : Border, selected ? 1.4f : 1f);
+
+        var rect = Rectangle.Inflate(e.Bounds, -1, -1);
+        e.Graphics.FillRectangle(bgBrush, rect);
+        e.Graphics.DrawRectangle(borderPen, rect);
+
+        var swatchRect = new Rectangle(rect.X + 8, rect.Y + 6, 12, 12);
+        e.Graphics.FillRectangle(swatchBrush, swatchRect);
+        e.Graphics.DrawRectangle(Pens.Black, swatchRect);
+
+        var titleRect = new Rectangle(rect.X + 28, rect.Y + 4, rect.Width - 96, 14);
+        var metaRect = new Rectangle(rect.X + 28, rect.Y + 15, rect.Width - 96, 10);
+        using var titleFont = new Font("Segoe UI Semibold", 8.6f, FontStyle.Bold);
+        using var metaFont = new Font("Segoe UI", 7.7f);
+        TextRenderer.DrawText(e.Graphics, definition.Name, titleFont, titleRect, textBrush.Color, TextFormatFlags.Left | TextFormatFlags.EndEllipsis);
+        TextRenderer.DrawText(e.Graphics, $"({entry.Item.X},{entry.Item.Y}) • rot {entry.Item.Rotation}° • {definition.Layer}", metaFont, metaRect, mutedBrush.Color, TextFormatFlags.Left | TextFormatFlags.EndEllipsis);
+
+        if (entry.Locked)
+        {
+            var badge = new Rectangle(rect.Right - 50, rect.Y + 5, 42, 15);
+            using var badgeBrush = new SolidBrush(Color.FromArgb(62, 255, 214, 84));
+            using var badgePen = new Pen(Accent, 1f);
+            e.Graphics.FillRectangle(badgeBrush, badge);
+            e.Graphics.DrawRectangle(badgePen, badge);
+            using (var badgeFont = new Font("Segoe UI", 7.2f, FontStyle.Bold)) TextRenderer.DrawText(e.Graphics, "LOCK", badgeFont, badge, Color.FromArgb(255, 235, 180), TextFormatFlags.HorizontalCenter | TextFormatFlags.VerticalCenter);
+        }
+
+        e.DrawFocusRectangle();
+    }
+
+    private void WireEvents()
+    {
+        _canvas.ProjectChanged += (_, _) => RefreshProjectUi();
+        _canvas.SelectionChanged += (_, _) => RefreshSelectionUi();
+        _canvas.HistoryChanged += (_, _) => RefreshHistoryUi();
+        _canvas.BlueprintChanged += (_, _) => RefreshBlueprintUi();
+        _canvas.StatusMessage += (_, message) => _statusLabel.Text = message;
+
+        _projectNameText.TextChanged += (_, _) =>
+        {
+            if (_suppressUiEvents) return;
+            _canvas.Project.Name = string.IsNullOrWhiteSpace(_projectNameText.Text) ? "Untitled CAMP" : _projectNameText.Text.Trim();
+            _canvas.Invalidate();
+            RefreshProjectUi();
+        };
+
+        _modeCombo.SelectedIndexChanged += (_, _) =>
+        {
+            if (_suppressUiEvents) return;
+            if (_modeCombo.SelectedItem is BuildMode mode)
+            {
+                _canvas.Project.Mode = mode;
+                RefreshProjectUi();
+                _canvas.Invalidate();
+            }
+        };
+
+        _ruleCombo.SelectedIndexChanged += (_, _) =>
+        {
+            if (_suppressUiEvents) return;
+            if (_ruleCombo.SelectedItem is RuleProfile profile)
+            {
+                _canvas.Project.RuleProfile = profile;
+                RefreshProjectUi();
+                _canvas.Invalidate();
+            }
+        };
+
+        _budgetLimitInput.ValueChanged += (_, _) =>
+        {
+            if (_suppressUiEvents) return;
+            _canvas.Project.BudgetLimit = (int)_budgetLimitInput.Value;
+            RefreshProjectUi();
+        };
+
+        _storedBudgetInput.ValueChanged += (_, _) =>
+        {
+            if (_suppressUiEvents) return;
+            _canvas.Project.StoredBudget = (int)_storedBudgetInput.Value;
+            RefreshProjectUi();
+        };
+
+        _gridWidthInput.ValueChanged += (_, _) =>
+        {
+            if (_suppressUiEvents) return;
+            _canvas.Project.GridWidth = (int)_gridWidthInput.Value;
+            _canvas.Invalidate();
+            RefreshProjectUi();
+        };
+
+        _gridHeightInput.ValueChanged += (_, _) =>
+        {
+            if (_suppressUiEvents) return;
+            _canvas.Project.GridHeight = (int)_gridHeightInput.Value;
+            _canvas.Invalidate();
+            RefreshProjectUi();
+        };
+
+        _zoomInput.ValueChanged += (_, _) =>
+        {
+            if (_suppressUiEvents) return;
+            _canvas.ZoomPercent = (int)_zoomInput.Value;
+        };
+
+        _presetCombo.SelectedIndexChanged += (_, _) => RefreshPresetDescription();
+        _itemFilterText.TextChanged += (_, _) => RefreshItemList();
+        _itemLayerFilterCombo.SelectedIndexChanged += (_, _) => RefreshItemList();
+
+        _itemList.SelectedIndexChanged += (_, _) =>
+        {
+            if (_suppressUiEvents) return;
+            var ids = _itemList.SelectedItems.OfType<ItemListEntry>().Select(x => x.Item.Id).ToList();
+            _canvas.SelectItems(ids);
+            if (ids.Count > 0)
+            {
+                _statusLabel.Text = $"Selected {ids.Count} item(s) from list.";
+            }
+        };
+    }
+
+    private void SetActiveTool(ToolType tool)
+    {
+        _canvas.CurrentTool = tool;
+        foreach (var (key, button) in _toolButtons)
+        {
+            button.Checked = key == tool;
+            button.BackColor = key == tool ? Color.FromArgb(66, 74, 90) : BgCard;
+        }
+
+        _statusLabel.Text = $"Active tool: {tool}";
+        RefreshProjectUi();
+    }
+
+    private void NewProject()
+    {
+        _currentPath = null;
+        _canvas.Project = PresetLibrary.GetById("custom").CreateProject();
+        _canvas.Project.Name = "Knoksen Foundation Draft";
+        SetActiveTool(ToolType.Foundation);
+        _zoomInput.Value = 100;
+        RefreshProjectUi();
+        RefreshPresetDescription();
+        RefreshBlueprintUi();
+        _statusLabel.Text = "New project created.";
+    }
+
+    private void ApplySelectedPreset()
+    {
+        if (_presetCombo.SelectedItem is not ProjectPreset preset)
+        {
+            return;
+        }
+
+        _currentPath = null;
+        _canvas.Project = preset.CreateProject();
+        SetActiveTool(ToolType.Foundation);
+        RefreshProjectUi();
+        RefreshBlueprintUi();
+        _statusLabel.Text = $"Applied preset: {preset.Name}.";
+    }
+
+    private void RefreshProjectUi()
+    {
+        _suppressUiEvents = true;
+        try
+        {
+            var project = NormalizeProject(_canvas.Project);
+
+            if (_projectNameText.Text != project.Name)
+            {
+                _projectNameText.Text = project.Name;
+            }
+
+            _modeCombo.SelectedItem = project.Mode;
+            _ruleCombo.SelectedItem = project.RuleProfile;
+            _budgetLimitInput.Value = ClampDecimal(project.BudgetLimit, _budgetLimitInput.Minimum, _budgetLimitInput.Maximum);
+            _storedBudgetInput.Value = ClampDecimal(project.StoredBudget, _storedBudgetInput.Minimum, _storedBudgetInput.Maximum);
+            _gridWidthInput.Value = ClampDecimal(project.GridWidth, _gridWidthInput.Minimum, _gridWidthInput.Maximum);
+            _gridHeightInput.Value = ClampDecimal(project.GridHeight, _gridHeightInput.Minimum, _gridHeightInput.Maximum);
+            _zoomInput.Value = ClampDecimal(_canvas.ZoomPercent, _zoomInput.Minimum, _zoomInput.Maximum);
+
+            var selectedPreset = PresetLibrary.GetById(project.PresetId);
+            _presetCombo.SelectedItem = PresetLibrary.All.FirstOrDefault(x => x.Id == selectedPreset.Id);
+            _presetDescriptionLabel.Text = selectedPreset.Description;
+
+            foreach (var (layer, check) in _layerChecks)
+            {
+                check.Checked = project.LayerVisibility.IsVisible(layer);
+            }
+
+            foreach (var (layer, lockCheck) in _layerLockChecks)
+            {
+                lockCheck.Checked = project.LayerLocks.IsLocked(layer);
+            }
+
+            if (_showCampRadiusCheck is not null)
+            {
+                _showCampRadiusCheck.Checked = project.ShowCampRadiusOverlay;
+            }
+
+            if (_showTurretCoverageCheck is not null)
+            {
+                _showTurretCoverageCheck.Checked = project.ShowTurretCoverage;
+            }
+
+            var placedBudget = project.Items.Sum(x => Catalog.ById.TryGetValue(x.DefinitionId, out var def) ? def.BudgetCost : 0);
+            var totalBudget = placedBudget + project.StoredBudget;
+            _budgetProgress.Maximum = Math.Max(1, project.BudgetLimit);
+            _budgetProgress.Value = Math.Max(0, Math.Min(_budgetProgress.Maximum, totalBudget));
+            _budgetLabel.Text = $"Placed {placedBudget} • Stored {project.StoredBudget} • Total {totalBudget} / {project.BudgetLimit}";
+            _modeLabel.Text = $"Mode: {project.Mode}   •   Rules: {project.RuleProfile}   •   Tool: {_canvas.CurrentTool}";
+
+            _overviewHeroLabel.Text = project.Name;
+            _overviewMetaLabel.Text = $"{selectedPreset.Name} • {project.Mode} • Grid {project.GridWidth}x{project.GridHeight} • Zoom {_canvas.ZoomPercent}%";
+            _statusCardLabel.Text = $"Budget {Math.Min(100, (int)Math.Round((double)totalBudget / Math.Max(1, project.BudgetLimit) * 100))}% • {_canvas.CurrentTool} active • {_canvas.SelectedItems.Count} selected";
+
+            RefreshItemList();
+            RefreshSelectionUi();
+            RefreshHistoryUi();
+            RefreshBlueprintUi();
+            RefreshWorkflowUi();
+            RefreshFocusUi();
+            RefreshAnalysisUi();
+        }
+        finally
+        {
+            _suppressUiEvents = false;
+        }
+    }
+
+    private void RefreshItemList()
+    {
+        var project = _canvas.Project;
+        var selectedIds = _canvas.SelectedItems.Select(x => x.Id).ToHashSet();
+        var query = (_itemFilterText.Text ?? string.Empty).Trim();
+        var selectedLayer = _itemLayerFilterCombo.SelectedItem;
+
+        IEnumerable<PlacedItem> filtered = project.Items;
+        if (!string.IsNullOrWhiteSpace(query))
+        {
+            filtered = filtered.Where(item =>
+            {
+                Catalog.ById.TryGetValue(item.DefinitionId, out var def);
+                var hay = $"{def?.Name} {item.Note} {item.X} {item.Y}";
+                return hay.Contains(query, StringComparison.OrdinalIgnoreCase);
+            });
+        }
+
+        if (selectedLayer is LayerType layerFilter)
+        {
+            filtered = filtered.Where(item => Catalog.ById.TryGetValue(item.DefinitionId, out var def) && def.Layer == layerFilter);
+        }
+
+        _itemList.BeginUpdate();
+        _itemList.Items.Clear();
+        foreach (var item in filtered)
+        {
+            if (!Catalog.ById.TryGetValue(item.DefinitionId, out var definition))
+            {
+                continue;
+            }
+
+            _itemList.Items.Add(new ItemListEntry(item, definition.Name, project.LayerLocks.IsLocked(definition.Layer)));
+        }
+
+        for (var i = 0; i < _itemList.Items.Count; i++)
+        {
+            if (_itemList.Items[i] is ItemListEntry entry && selectedIds.Contains(entry.Item.Id))
+            {
+                _itemList.SetSelected(i, true);
+            }
+        }
+        _itemList.EndUpdate();
+    }
+
+
+    private void ActivateWorkflowStage(string stage)
+    {
+        switch (stage)
+        {
+            case "Layout":
+                ApplyFocusPreset("Structure");
+                SetActiveTool(ToolType.Foundation);
+                break;
+            case "Envelope":
+                ApplyFocusPreset("Structure");
+                SetActiveTool(ToolType.Wall);
+                break;
+            case "Systems":
+                ApplyFocusPreset("Systems");
+                SetActiveTool(ToolType.Power);
+                break;
+            case "Defense":
+                ApplyFocusPreset("Defense");
+                SetActiveTool(ToolType.Turret);
+                break;
+            case "Polish":
+                ApplyFocusPreset("Presentation");
+                SetActiveTool(ToolType.Decor);
+                break;
+            default:
+                ApplyFocusPreset("All");
+                break;
+        }
+
+        _statusLabel.Text = $"Workflow stage: {stage}";
+        RefreshProjectUi();
+    }
+
+    private void ApplyFocusPreset(string preset)
+    {
+        var project = _canvas.Project;
+        switch (preset)
+        {
+            case "Structure":
+                SetLayerVisibilityPreset(structure: true, utility: false, defense: false, power: false, aesthetic: false, commerce: false);
+                project.ShowCampRadiusOverlay = true;
+                project.ShowTurretCoverage = false;
+                break;
+            case "Systems":
+                SetLayerVisibilityPreset(structure: true, utility: true, defense: false, power: true, aesthetic: false, commerce: false);
+                project.ShowCampRadiusOverlay = true;
+                project.ShowTurretCoverage = false;
+                break;
+            case "Defense":
+                SetLayerVisibilityPreset(structure: true, utility: false, defense: true, power: true, aesthetic: false, commerce: false);
+                project.ShowCampRadiusOverlay = true;
+                project.ShowTurretCoverage = true;
+                break;
+            case "Presentation":
+                SetLayerVisibilityPreset(structure: true, utility: false, defense: false, power: false, aesthetic: true, commerce: true);
+                project.ShowCampRadiusOverlay = false;
+                project.ShowTurretCoverage = false;
+                break;
+            default:
+                SetLayerVisibilityPreset(structure: true, utility: true, defense: true, power: true, aesthetic: true, commerce: true);
+                project.ShowCampRadiusOverlay = true;
+                project.ShowTurretCoverage = true;
+                break;
+        }
+
+        _canvas.Invalidate();
+        RefreshProjectUi();
+        _statusLabel.Text = $"Focus preset: {preset}";
+    }
+
+    private void SetLayerVisibilityPreset(bool structure, bool utility, bool defense, bool power, bool aesthetic, bool commerce)
+    {
+        _canvas.Project.LayerVisibility.Structure = structure;
+        _canvas.Project.LayerVisibility.Utility = utility;
+        _canvas.Project.LayerVisibility.Defense = defense;
+        _canvas.Project.LayerVisibility.Power = power;
+        _canvas.Project.LayerVisibility.Aesthetic = aesthetic;
+        _canvas.Project.LayerVisibility.Commerce = commerce;
+    }
+
+    private string GetCurrentWorkflowStage()
+        => _canvas.CurrentTool switch
+        {
+            ToolType.Foundation => "Layout",
+            ToolType.Wall or ToolType.Door or ToolType.Stairs or ToolType.Roof => "Envelope",
+            ToolType.Workbench or ToolType.Power or ToolType.Light => "Systems",
+            ToolType.Turret => "Defense",
+            ToolType.Decor or ToolType.Vendor or ToolType.Resource or ToolType.Display or ToolType.Ally => "Polish",
+            _ => "Custom"
+        };
+
+    private void RefreshWorkflowUi()
+    {
+        var stage = GetCurrentWorkflowStage();
+        _workflowLabel.Text = stage switch
+        {
+            "Layout" => "Stage 1 – Layout\nPlace foundations, check footprint, radius and flow before details.",
+            "Envelope" => "Stage 2 – Envelope\nSnap walls, doors, stairs and roofs to harden the structure.",
+            "Systems" => "Stage 3 – Systems\nPlace workbenches, power and lights after the shell is stable.",
+            "Defense" => "Stage 4 – Defense\nUse turret arcs and perimeter logic to validate coverage.",
+            "Polish" => "Stage 5 – Polish / Presentation\nAdd decor, commerce and final readability without clutter.",
+            _ => "Custom stage\nFreeform editing – switch to a workflow stage for guided building."
+        };
+
+        foreach (var (key, button) in _workflowButtons)
+        {
+            var active = key == stage;
+            button.BackColor = active ? Accent : BgCard;
+            button.ForeColor = active ? Color.FromArgb(35, 26, 0) : TextPrimary;
+            button.FlatAppearance.BorderColor = active ? Accent : Border;
+        }
+    }
+    private void RefreshFocusUi()
+    {
+        var visible = Enum.GetValues<LayerType>()
+            .Where(layer => _canvas.Project.LayerVisibility.IsVisible(layer))
+            .Select(layer => layer.ToString())
+            .ToList();
+        _focusLabel.Text = $"Visible focus: {string.Join(", ", visible)}\nOverlays: radius {(_canvas.Project.ShowCampRadiusOverlay ? "On" : "Off")}, turret {(_canvas.Project.ShowTurretCoverage ? "On" : "Off")}";
+    }
+
+    private void RefreshSelectionUi()
+    {
+        var selected = _canvas.SelectedItems;
+        if (selected.Count == 0)
+        {
+            _selectionLabel.Text = "No selection.\nUse Select and click an item, or drag a marquee box.";
+            return;
+        }
+
+        if (selected.Count == 1)
+        {
+            var item = selected[0];
+            if (!Catalog.ById.TryGetValue(item.DefinitionId, out var definition))
+            {
+                _selectionLabel.Text = "Unknown selection.";
+                return;
+            }
+
+            _selectionLabel.Text = $"{definition.Name}\nGrid: ({item.X}, {item.Y})\nRotation: {item.Rotation}°\nLayer: {definition.Layer}\nBudget: {definition.BudgetCost}\nShelter allowed: {(definition.AllowedInShelter ? "Yes" : "No")}";
+            return;
+        }
+
+        var totalBudget = selected.Sum(x => Catalog.ById.TryGetValue(x.DefinitionId, out var def) ? def.BudgetCost : 0);
+        var layers = selected
+            .Select(x => Catalog.ById.TryGetValue(x.DefinitionId, out var def) ? def.Layer.ToString() : "Unknown")
+            .Distinct()
+            .OrderBy(x => x)
+            .ToList();
+        _selectionLabel.Text = $"Multi-selection\nItems: {selected.Count}\nCombined budget: {totalBudget}\nLayers: {string.Join(", ", layers)}\nDrag to move as one module\nR rotates whole group";
+    }
+
+    private void RefreshHistoryUi()
+    {
+        if (_undoButton is not null)
+        {
+            _undoButton.Enabled = _canvas.CanUndo;
+        }
+
+        if (_redoButton is not null)
+        {
+            _redoButton.Enabled = _canvas.CanRedo;
+        }
+
+        _historyLabel.Text = $"History: {(_canvas.CanUndo ? "Undo ready" : "Undo empty")} • {(_canvas.CanRedo ? "Redo ready" : "Redo empty")}";
+    }
+
+    private void RefreshAnalysisUi()
+    {
+        var centerX = _canvas.Project.CampCenterX >= 0 ? _canvas.Project.CampCenterX : _canvas.Project.GridWidth / 2;
+        var centerY = _canvas.Project.CampCenterY >= 0 ? _canvas.Project.CampCenterY : _canvas.Project.GridHeight / 2;
+        var lockedCount = Enum.GetValues<LayerType>().Count(layer => _canvas.Project.LayerLocks.IsLocked(layer));
+        var visibleCount = Enum.GetValues<LayerType>().Count(layer => _canvas.Project.LayerVisibility.IsVisible(layer));
+        _analysisLabel.Text = $"Approx center: ({centerX}, {centerY})\nSurface radius: {(_canvas.Project.ShowCampRadiusOverlay ? "On" : "Off")}\nTurret arcs: {(_canvas.Project.ShowTurretCoverage ? "On" : "Off")}\nVisible layers: {visibleCount}/6\nLocked layers: {lockedCount}";
+    }
+
+    private void RefreshBlueprintUi()
+    {
+        var blueprint = _canvas.LoadedBlueprint;
+        _blueprintLabel.Text = blueprint is null
+            ? "No blueprint loaded.\nExport a selection and reuse it as a module."
+            : $"Loaded: {blueprint.Name}\nItems: {blueprint.Items.Count}\nRecommended mode: {(blueprint.RecommendedMode?.ToString() ?? "Any")}\n{blueprint.Description}";
+    }
+
+    private void RefreshPresetDescription()
+    {
+        if (_presetCombo.SelectedItem is ProjectPreset preset)
+        {
+            _presetDescriptionLabel.Text = preset.Description;
+        }
+    }
+
+    private void SaveSelectionAsBlueprint()
+    {
+        using var dialog = new SaveFileDialog
+        {
+            Filter = "FO76 Blueprint JSON (*.blueprint.json)|*.blueprint.json|JSON (*.json)|*.json",
+            FileName = SafeFileName(_canvas.Project.Name) + "-module.blueprint.json",
+            Title = "Save selection as blueprint"
+        };
+
+        if (dialog.ShowDialog(this) != DialogResult.OK)
+        {
+            return;
+        }
+
+        try
+        {
+            _canvas.ExportSelectionAsBlueprint(dialog.FileName, Path.GetFileNameWithoutExtension(dialog.FileName));
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this, ex.Message, "Blueprint save failed", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+    }
+
+    private void LoadBlueprint()
+    {
+        using var dialog = new OpenFileDialog
+        {
+            Filter = "FO76 Blueprint JSON (*.blueprint.json;*.json)|*.blueprint.json;*.json|All Files (*.*)|*.*",
+            Title = "Load blueprint"
+        };
+
+        if (dialog.ShowDialog(this) != DialogResult.OK)
+        {
+            return;
+        }
+
+        try
+        {
+            _canvas.LoadBlueprint(dialog.FileName);
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this, ex.Message, "Blueprint load failed", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+    }
+
+    private void OpenProject()
+    {
+        using var dialog = new OpenFileDialog
+        {
+            Filter = "FO76 Planner JSON (*.json)|*.json|All Files (*.*)|*.*",
+            Title = "Open planner project"
+        };
+
+        if (dialog.ShowDialog(this) != DialogResult.OK)
+        {
+            return;
+        }
+
+        try
+        {
+            var json = File.ReadAllText(dialog.FileName);
+            var project = JsonSerializer.Deserialize<PlannerProject>(json, JsonOptions());
+            if (project is null)
+            {
+                throw new InvalidOperationException("Could not deserialize project file.");
+            }
+
+            NormalizeProject(project);
+            _currentPath = dialog.FileName;
+            _canvas.Project = project;
+            RefreshProjectUi();
+            _statusLabel.Text = $"Opened {Path.GetFileName(dialog.FileName)}.";
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this, ex.Message, "Open failed", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+    }
+
+    private void SaveProject(bool forceChoosePath)
+    {
+        var path = _currentPath;
+        if (forceChoosePath || string.IsNullOrWhiteSpace(path))
+        {
+            using var dialog = new SaveFileDialog
+            {
+                Filter = "FO76 Planner JSON (*.json)|*.json",
+                FileName = SafeFileName(_canvas.Project.Name) + ".json",
+                Title = "Save planner project"
+            };
+
+            if (dialog.ShowDialog(this) != DialogResult.OK)
+            {
+                return;
+            }
+
+            path = dialog.FileName;
+            _currentPath = path;
+        }
+
+        try
+        {
+            var json = JsonSerializer.Serialize(_canvas.Project, JsonOptions());
+            File.WriteAllText(path!, json);
+            _statusLabel.Text = $"Saved {Path.GetFileName(path)}.";
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this, ex.Message, "Save failed", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+    }
+
+    private void ExportPng()
+    {
+        using var dialog = new SaveFileDialog
+        {
+            Filter = "PNG Image (*.png)|*.png",
+            FileName = SafeFileName(_canvas.Project.Name) + ".png",
+            Title = "Export canvas as PNG"
+        };
+
+        if (dialog.ShowDialog(this) != DialogResult.OK)
+        {
+            return;
+        }
+
+        try
+        {
+            using var bitmap = _canvas.RenderToBitmap();
+            bitmap.Save(dialog.FileName);
+            _statusLabel.Text = $"Exported {Path.GetFileName(dialog.FileName)}.";
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this, ex.Message, "Export failed", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+    }
+
+    private static PlannerProject NormalizeProject(PlannerProject project)
+    {
+        project.PresetId = string.IsNullOrWhiteSpace(project.PresetId) ? "custom" : project.PresetId;
+        project.LayerVisibility ??= new LayerVisibilitySettings();
+        project.LayerLocks ??= new LayerLockSettings();
+        project.Name = string.IsNullOrWhiteSpace(project.Name) ? "Untitled CAMP" : project.Name;
+        project.GridWidth = Math.Max(10, project.GridWidth);
+        project.GridHeight = Math.Max(10, project.GridHeight);
+        project.BudgetLimit = Math.Max(100, project.BudgetLimit);
+        project.CellSize = Math.Max(24, project.CellSize);
+        return project;
+    }
+
+    private static JsonSerializerOptions JsonOptions()
+        => new()
+        {
+            WriteIndented = true,
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+        };
+
+    private static string SafeFileName(string value)
+    {
+        foreach (var c in Path.GetInvalidFileNameChars())
+        {
+            value = value.Replace(c, '_');
+        }
+        return string.IsNullOrWhiteSpace(value) ? "fo76-camp-planner" : value;
+    }
+
+    private static decimal ClampDecimal(int value, decimal min, decimal max)
+        => Math.Min(max, Math.Max(min, value));
+
+    private static Color GetLayerSwatch(LayerType layer)
+        => layer switch
+        {
+            LayerType.Structure => Color.FromArgb(143, 124, 107),
+            LayerType.Utility => Color.FromArgb(114, 170, 123),
+            LayerType.Defense => Color.FromArgb(191, 90, 90),
+            LayerType.Power => Color.FromArgb(255, 196, 87),
+            LayerType.Aesthetic => Color.FromArgb(122, 160, 214),
+            LayerType.Commerce => Color.FromArgb(176, 122, 194),
+            _ => Accent
+        };
+
+    private sealed class ItemListEntry
+    {
+        public ItemListEntry(PlacedItem item, string name, bool locked)
+        {
+            Item = item;
+            Name = name;
+            Locked = locked;
+        }
+
+        public PlacedItem Item { get; }
+        public string Name { get; }
+        public bool Locked { get; }
+        public override string ToString() => Name;
+    }
+}

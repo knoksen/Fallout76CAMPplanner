@@ -1,0 +1,23 @@
+{
+  "name": "Foundation Ring",
+  "description": "2x2 surface starter module with a perimeter of walls and one door anchor.",
+  "recommendedMode": 0,
+  "items": [
+    { "definitionId": "foundation", "x": 0, "y": 0, "rotation": 0, "note": "Foundation" },
+    { "definitionId": "foundation", "x": 1, "y": 0, "rotation": 0, "note": "Foundation" },
+    { "definitionId": "foundation", "x": 0, "y": 1, "rotation": 0, "note": "Foundation" },
+    { "definitionId": "foundation", "x": 1, "y": 1, "rotation": 0, "note": "Foundation" },
+    { "definitionId": "wall", "x": 0, "y": -1, "rotation": 0, "note": "North wall" },
+    { "definitionId": "wall", "x": 1, "y": -1, "rotation": 0, "note": "North wall" },
+    { "definitionId": "door", "x": 0, "y": 2, "rotation": 180, "note": "South door" },
+    { "definitionId": "wall", "x": 1, "y": 2, "rotation": 180, "note": "South wall" },
+    { "definitionId": "wall", "x": -1, "y": 0, "rotation": 270, "note": "West wall" },
+    { "definitionId": "wall", "x": -1, "y": 1, "rotation": 270, "note": "West wall" },
+    { "definitionId": "wall", "x": 2, "y": 0, "rotation": 90, "note": "East wall" },
+    { "definitionId": "wall", "x": 2, "y": 1, "rotation": 90, "note": "East wall" },
+    { "definitionId": "roof", "x": 0, "y": 0, "rotation": 0, "note": "Roof" },
+    { "definitionId": "roof", "x": 1, "y": 0, "rotation": 0, "note": "Roof" },
+    { "definitionId": "roof", "x": 0, "y": 1, "rotation": 0, "note": "Roof" },
+    { "definitionId": "roof", "x": 1, "y": 1, "rotation": 0, "note": "Roof" }
+  ]
+}

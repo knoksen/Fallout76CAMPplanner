@@ -1,0 +1,233 @@
+{
+  "name": "Knoksen Defense Overlay Sample",
+  "presetId": "nuke-camp",
+  "mode": 0,
+  "ruleProfile": 1,
+  "budgetLimit": 1100,
+  "storedBudget": 60,
+  "gridWidth": 36,
+  "gridHeight": 26,
+  "cellSize": 48,
+  "layerVisibility": {
+    "structure": true,
+    "utility": true,
+    "defense": true,
+    "power": true,
+    "aesthetic": true,
+    "commerce": true
+  },
+  "layerLocks": {
+    "structure": false,
+    "utility": false,
+    "defense": true,
+    "power": true,
+    "aesthetic": false,
+    "commerce": false
+  },
+  "showCampRadiusOverlay": true,
+  "showTurretCoverage": true,
+  "campCenterX": 12,
+  "campCenterY": 9,
+  "items": [
+    {
+      "id": "021e0176-3ed0-498f-af74-0191c17788c7",
+      "definitionId": "foundation",
+      "x": 10,
+      "y": 7,
+      "rotation": 0,
+      "note": "Foundation"
+    },
+    {
+      "id": "5d49d051-1bb9-491d-b8a7-fac816d242ac",
+      "definitionId": "foundation",
+      "x": 10,
+      "y": 8,
+      "rotation": 0,
+      "note": "Foundation"
+    },
+    {
+      "id": "021a04bd-d528-4108-9c72-da77e8de5036",
+      "definitionId": "foundation",
+      "x": 10,
+      "y": 9,
+      "rotation": 0,
+      "note": "Foundation"
+    },
+    {
+      "id": "abdc099d-2b61-400f-a38b-f6087bb50d50",
+      "definitionId": "foundation",
+      "x": 10,
+      "y": 10,
+      "rotation": 0,
+      "note": "Foundation"
+    },
+    {
+      "id": "f5f7071b-6fae-4129-a72a-8b929acdab88",
+      "definitionId": "foundation",
+      "x": 11,
+      "y": 7,
+      "rotation": 0,
+      "note": "Foundation"
+    },
+    {
+      "id": "8836c819-9ae2-4ec3-b50b-cdbdcae5ae97",
+      "definitionId": "foundation",
+      "x": 11,
+      "y": 10,
+      "rotation": 0,
+      "note": "Foundation"
+    },
+    {
+      "id": "fd1f62c2-5a3b-48fb-8ce5-a09d2fd07ae4",
+      "definitionId": "foundation",
+      "x": 12,
+      "y": 7,
+      "rotation": 0,
+      "note": "Foundation"
+    },
+    {
+      "id": "aa148fa8-b0e2-438c-a59f-f78ead2babd3",
+      "definitionId": "foundation",
+      "x": 12,
+      "y": 10,
+      "rotation": 0,
+      "note": "Foundation"
+    },
+    {
+      "id": "398ac82b-98a8-4c42-b377-8ebbacfb5307",
+      "definitionId": "foundation",
+      "x": 13,
+      "y": 7,
+      "rotation": 0,
+      "note": "Foundation"
+    },
+    {
+      "id": "92672a79-5f6a-4509-8e57-8be2bdb6a047",
+      "definitionId": "foundation",
+      "x": 13,
+      "y": 8,
+      "rotation": 0,
+      "note": "Foundation"
+    },
+    {
+      "id": "048550a8-d616-4e31-97c3-73f63f21868e",
+      "definitionId": "foundation",
+      "x": 13,
+      "y": 9,
+      "rotation": 0,
+      "note": "Foundation"
+    },
+    {
+      "id": "596047a9-9b10-4f2f-a1b9-bd2940ccf688",
+      "definitionId": "foundation",
+      "x": 13,
+      "y": 10,
+      "rotation": 0,
+      "note": "Foundation"
+    },
+    {
+      "id": "11c4b560-33a0-42d1-bb72-6cd993a42dc8",
+      "definitionId": "door",
+      "x": 11,
+      "y": 7,
+      "rotation": 0,
+      "note": "North door"
+    },
+    {
+      "id": "e984b5c5-2bd5-4747-9418-421bebc974b6",
+      "definitionId": "stairs",
+      "x": 14,
+      "y": 8,
+      "rotation": 90,
+      "note": "Right access stairs"
+    },
+    {
+      "id": "e3971c21-05e9-46f2-b08d-a694191ee817",
+      "definitionId": "workbench",
+      "x": 11,
+      "y": 8,
+      "rotation": 0,
+      "note": "Bench core"
+    },
+    {
+      "id": "ba2c3aee-4434-442d-8766-79050736e8fe",
+      "definitionId": "power",
+      "x": 12,
+      "y": 8,
+      "rotation": 0,
+      "note": "Generator node"
+    },
+    {
+      "id": "57f37af5-54fd-4288-bea4-1f143ea11507",
+      "definitionId": "light",
+      "x": 11,
+      "y": 9,
+      "rotation": 0,
+      "note": "Work light"
+    },
+    {
+      "id": "8b8febd9-fdb8-44ea-8677-edc5810f64cd",
+      "definitionId": "turret",
+      "x": 10,
+      "y": 6,
+      "rotation": 180,
+      "note": "Northwest turret"
+    },
+    {
+      "id": "0822ec88-b9dc-4c9d-88ea-5698c66f477d",
+      "definitionId": "turret",
+      "x": 13,
+      "y": 6,
+      "rotation": 180,
+      "note": "Northeast turret"
+    },
+    {
+      "id": "bdbc1323-a7e4-4904-8352-7aee193058d0",
+      "definitionId": "turret",
+      "x": 9,
+      "y": 8,
+      "rotation": 90,
+      "note": "West turret"
+    },
+    {
+      "id": "4d6cea16-15e6-486c-a213-c2672fbea138",
+      "definitionId": "turret",
+      "x": 14,
+      "y": 8,
+      "rotation": 270,
+      "note": "East turret"
+    },
+    {
+      "id": "89854b5a-4c2e-4e48-bb50-d946b9ae7c4b",
+      "definitionId": "turret",
+      "x": 10,
+      "y": 11,
+      "rotation": 0,
+      "note": "Southwest turret"
+    },
+    {
+      "id": "237f5883-cc73-4503-9656-89a3ee5ef654",
+      "definitionId": "turret",
+      "x": 13,
+      "y": 11,
+      "rotation": 0,
+      "note": "Southeast turret"
+    },
+    {
+      "id": "787d34b6-cc82-4ae2-815c-ff28046a3967",
+      "definitionId": "decor",
+      "x": 16,
+      "y": 8,
+      "rotation": 0,
+      "note": "Marker decor"
+    },
+    {
+      "id": "db9f7d2c-1d9b-4b9c-b31e-bba1d581e9bc",
+      "definitionId": "vendor",
+      "x": 16,
+      "y": 9,
+      "rotation": 0,
+      "note": "Vendor lane"
+    }
+  ]
+}
