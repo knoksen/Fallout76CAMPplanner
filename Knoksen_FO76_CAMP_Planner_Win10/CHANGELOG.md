@@ -4,6 +4,84 @@ All notable changes to FO76 CAMP Planner are documented in this file. This proje
 
 ---
 
+## [Unreleased]
+
+### Foundation Release (v1.0) – release preparation pass
+
+#### Implemented
+- Added low-risk Scenario Compare controls in Analysis:
+  - capture current plan as baseline
+  - compare current state vs baseline for defense score, placed budget, and covered ingress count
+  - clear baseline to restart A/B planning passes
+- Verified and retained v1.0 core feature set for first Windows testing:
+  - minimap
+  - inspector editing
+  - blueprint export/load and slot-library operations
+  - visitor-flow overlay and route markers
+  - trap-zone overlay and structured trap plans
+
+### Planning Engine (v1.1) – stability and workflow polish
+
+#### Implemented
+- Replaced binary smart-snap toggle with explicit tri-state snap mode in Rules:
+  - `Strict` = always snap to nearest valid anchors
+  - `Relaxed` = snap only when close to valid anchors
+  - `Off` = no snapping adjustments
+- Updated the toolbar `Snap` action to cycle through `Strict → Relaxed → Off`.
+- Added legacy project compatibility for older JSON files that still store `SnapEnabled`.
+- Added directional quick-duplicate actions for selected trap zones (`← → ↑ ↓`) in Route/Trap planning controls.
+- Added inspector nudge workflow for precise one-cell movement using directional controls.
+- Improved placement feedback by surfacing invalid-placement reason text in footer hints during placement preview.
+- Improved grouped editing by rotating multi-selection around a true group pivot with placement validation and rollback safety.
+
+### Device Hub / Quick Launch Center – user-facing launch workflows
+
+#### Implemented
+- Added a new `Device Hub` tab with large, touch-friendly button groups for `PC`, `Mobile Companion`, and `Console`.
+- Added JSON-backed launch profile model in project data (`deviceHub`) for configurable platform targets and notes.
+- Added PC quick actions:
+  - open project folder
+  - open release folder
+  - launch published `FO76CampPlanner.exe` when present
+  - open GitHub, SourceForge, and configured docs/resources targets
+- Added Mobile companion actions:
+  - open mobile export folder
+  - export compact project summary
+  - generate snapshot pack (PNG + summary)
+  - generate QR-ready link list file
+  - quick switch to compact presentation review mode
+- Added Console quick actions for Xbox, PlayStation, and Generic Console using configurable targets.
+- Added safety UX:
+  - disabled state for unavailable targets
+  - friendly tooltip messaging explaining missing configuration
+  - status-strip feedback for success/failure of launch actions
+
+### Fallout 76 Logic (v1.2) – defense analysis strengthening
+
+#### Implemented
+- Expanded the Analysis panel with approximate defense scoring (`0-100`) based on turret density, defense density, ingress coverage, and trap-zone severity.
+- Added ingress coverage summary (`covered/total`) using approximate turret arc/range matching.
+- Added actionable risk hints (missing turret coverage, uncovered ingress routes, critical-zone review reminders, and overlay visibility hints).
+- Strengthened defense scoring with playstyle-profile targets (turrets/defense items/ingress/trap-zones) and route completeness factors (ingress, checkpoint, egress).
+- Expanded route planning summary with explicit ingress/checkpoint/egress composition and count of flow markers inside high/critical trap zones.
+- Strengthened mode logic by enforcing Shelter-specific rules on mode switch (auto-shelter rule profile, shelter-safe overlays, incompatible item pruning).
+- Upgraded visitor-flow visualization with coverage-aware ingress markers and segment coloring based on trap-zone severity.
+- Added concrete shelter-type rule enforcement for shelter presets:
+  - per-preset cap for turret count
+  - per-preset cap for route markers and trap zones
+  - per-preset maximum trap severity
+  - analysis/risk hints now surface cap violations for existing projects
+- Added shelter advisory text in Route/Trap planning that shows cap headroom and fallback guidance before caps are reached.
+- Added soft-disable behavior for shelter-constrained Route/Trap actions so marker/zone add actions are disabled when caps are reached, and high-severity presets are disabled when above the shelter severity cap.
+- Added reason-aware tooltips on disabled Route/Trap actions to explain exact shelter constraints (marker cap, zone cap, or severity ceiling).
+- Added inline Route/Trap cap meter with live marker/zone usage bars and warning/error coloring for near-cap and cap-reached states.
+
+#### Release workflow
+- Added `BUILD_AND_PUBLISH_v10.ps1` wrapper script to keep release automation naming aligned with project workflow instructions.
+- Added `GENERATE_RELEASE_MANIFEST.ps1` to produce publish-folder release manifests with file sizes and SHA256 hashes.
+
+---
+
 ## [1.1.0-preview] – 2026-03-30
 
 ### Planning Engine (v1.1) – roadmap execution pass

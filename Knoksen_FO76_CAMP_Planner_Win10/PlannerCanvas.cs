@@ -31,6 +31,7 @@ public sealed class PlannerCanvas : Control
     private bool _dragTrapZoneChanged;
     private Point _dragTrapStartGrid;
     private Rectangle _dragTrapStartRect;
+    private string? _placementPreviewMessage;
 
     public PlannerCanvas()
     {
@@ -586,15 +587,42 @@ public sealed class PlannerCanvas : Control
 
         var snapshot = CloneProject(_project);
 
-        foreach (var item in _project.Items.Where(x => _selectedIds.Contains(x.Id)))
+        var selectedItems = _project.Items.Where(x => _selectedIds.Contains(x.Id)).ToList();
+        if (selectedItems.Count == 1)
         {
+            var item = selectedItems[0];
             item.Rotation = (item.Rotation + 90) % 360;
-            if (_selectedIds.Count == 1 && Catalog.ById.TryGetValue(item.DefinitionId, out var definition))
+            if (Catalog.ById.TryGetValue(item.DefinitionId, out var definition))
             {
                 var snapped = ApplySmartSnap(item, definition);
                 item.X = snapped.X;
                 item.Y = snapped.Y;
                 item.Rotation = snapped.Rotation;
+            }
+        }
+        else
+        {
+            var pivot = GetSelectionPivot(selectedItems);
+            foreach (var item in selectedItems)
+            {
+                if (!Catalog.ById.TryGetValue(item.DefinitionId, out var definition))
+                {
+                    continue;
+                }
+
+                var currentSize = GetSize(definition, item.Rotation);
+                var newRotation = (item.Rotation + 90) % 360;
+                var rotatedSize = GetSize(definition, newRotation);
+
+                var centerX = item.X + (currentSize.Width / 2d);
+                var centerY = item.Y + (currentSize.Height / 2d);
+
+                var rotatedCenterX = pivot.X + (centerY - pivot.Y);
+                var rotatedCenterY = pivot.Y - (centerX - pivot.X);
+
+                item.X = (int)Math.Round(rotatedCenterX - (rotatedSize.Width / 2d));
+                item.Y = (int)Math.Round(rotatedCenterY - (rotatedSize.Height / 2d));
+                item.Rotation = newRotation;
             }
         }
 
@@ -612,7 +640,29 @@ public sealed class PlannerCanvas : Control
         PushUndoSnapshot(snapshot);
         RaiseProjectChanged();
         Invalidate();
-        StatusMessage?.Invoke(this, "Selection rotated.");
+        StatusMessage?.Invoke(this, selectedItems.Count > 1 ? "Selection rotated around group pivot." : "Selection rotated.");
+    }
+
+    private static PointF GetSelectionPivot(IReadOnlyList<PlacedItem> selectedItems)
+    {
+        var centers = selectedItems
+            .Where(item => Catalog.ById.ContainsKey(item.DefinitionId))
+            .Select(item =>
+            {
+                var definition = Catalog.ById[item.DefinitionId];
+                var size = GetSize(definition, item.Rotation);
+                return new PointF((float)(item.X + (size.Width / 2d)), (float)(item.Y + (size.Height / 2d)));
+            })
+            .ToList();
+
+        if (centers.Count == 0)
+        {
+            return new PointF(0f, 0f);
+        }
+
+        var pivotX = centers.Average(point => point.X);
+        var pivotY = centers.Average(point => point.Y);
+        return new PointF((float)pivotX, (float)pivotY);
     }
 
     public void Undo()
@@ -762,6 +812,103 @@ public sealed class PlannerCanvas : Control
             _ => "zone"
         };
         StatusMessage?.Invoke(this, clones.Count == 1 ? $"Duplicated {direction}." : $"{clones.Count} items duplicated {direction}.");
+    }
+
+    public void QuickDuplicateTrapZone(Guid trapZoneId, int deltaX, int deltaY)
+    {
+        var trapZone = _project.TrapZones.FirstOrDefault(x => x.Id == trapZoneId);
+        if (trapZone is null)
+        {
+            StatusMessage?.Invoke(this, "Select a valid trap zone first.");
+            return;
+        }
+
+        var offsetX = deltaX == 0 ? 0 : (deltaX > 0 ? Math.Max(1, trapZone.Width) : -Math.Max(1, trapZone.Width));
+        var offsetY = deltaY == 0 ? 0 : (deltaY > 0 ? Math.Max(1, trapZone.Height) : -Math.Max(1, trapZone.Height));
+
+        var clone = new TrapZonePlan
+        {
+            Id = Guid.NewGuid(),
+            Label = trapZone.Label,
+            Severity = trapZone.Severity,
+            Notes = trapZone.Notes,
+            X = trapZone.X + offsetX,
+            Y = trapZone.Y + offsetY,
+            Width = Math.Max(1, trapZone.Width),
+            Height = Math.Max(1, trapZone.Height)
+        };
+
+        if (clone.X < 0 || clone.Y < 0 || clone.X + clone.Width > _project.GridWidth || clone.Y + clone.Height > _project.GridHeight)
+        {
+            StatusMessage?.Invoke(this, "Cannot quick-duplicate trap zone: outside build grid.");
+            return;
+        }
+
+        var trapZoneRuleFailure = ValidateShelterTrapZoneMutation(clone.Severity, true);
+        if (trapZoneRuleFailure is not null)
+        {
+            StatusMessage?.Invoke(this, trapZoneRuleFailure);
+            return;
+        }
+
+        PushUndoSnapshot();
+        _project.TrapZones.Add(clone);
+        RaiseProjectChanged();
+        Invalidate();
+
+        var direction = (deltaX, deltaY) switch
+        {
+            (1, 0) => "right",
+            (-1, 0) => "left",
+            (0, 1) => "down",
+            (0, -1) => "up",
+            _ => "zone"
+        };
+
+        StatusMessage?.Invoke(this, $"Trap zone duplicated {direction}.");
+    }
+
+    public void NudgeSelection(int deltaX, int deltaY)
+    {
+        var selected = SelectedItems;
+        if (selected.Count == 0)
+        {
+            StatusMessage?.Invoke(this, "Nothing selected.");
+            return;
+        }
+
+        var moved = selected.Select(item => new PlacedItem
+        {
+            Id = item.Id,
+            DefinitionId = item.DefinitionId,
+            X = item.X + deltaX,
+            Y = item.Y + deltaY,
+            Rotation = item.Rotation,
+            Note = item.Note
+        }).ToList();
+
+        var ignoreIds = selected.Select(x => x.Id).ToHashSet();
+        var reason = ValidateGroupPlacement(moved, ignoreIds);
+        if (reason is not null)
+        {
+            StatusMessage?.Invoke(this, reason);
+            return;
+        }
+
+        PushUndoSnapshot();
+        var movedById = moved.ToDictionary(item => item.Id, item => item);
+        foreach (var item in _project.Items)
+        {
+            if (movedById.TryGetValue(item.Id, out var updated))
+            {
+                item.X = updated.X;
+                item.Y = updated.Y;
+            }
+        }
+
+        RaiseProjectChanged();
+        Invalidate();
+        StatusMessage?.Invoke(this, selected.Count == 1 ? "Item nudged." : "Selection nudged.");
     }
 
     public void DeleteSelection()
@@ -1047,6 +1194,18 @@ public sealed class PlannerCanvas : Control
             return;
         }
 
+        if (enabled)
+        {
+            var selectedSeverity = severity ?? TrapZoneSeverity.Medium;
+            var createNewZone = SelectionWouldCreateNewTrapZone();
+            var trapZoneRuleFailure = ValidateShelterTrapZoneMutation(selectedSeverity, createNewZone);
+            if (trapZoneRuleFailure is not null)
+            {
+                StatusMessage?.Invoke(this, trapZoneRuleFailure);
+                return;
+            }
+        }
+
         var snapshot = CloneProject(_project);
         var changed = 0;
         var trapZoneCountBefore = _project.TrapZones.Count;
@@ -1118,6 +1277,13 @@ public sealed class PlannerCanvas : Control
         if (point is null)
         {
             StatusMessage?.Invoke(this, "Move the pointer over the grid or select an item first.");
+            return;
+        }
+
+        var markerRuleFailure = ValidateShelterVisitorMarkerAddition();
+        if (markerRuleFailure is not null)
+        {
+            StatusMessage?.Invoke(this, markerRuleFailure);
             return;
         }
 
@@ -1251,6 +1417,14 @@ public sealed class PlannerCanvas : Control
             return;
         }
 
+        var createNewZone = SelectionWouldCreateNewTrapZone();
+        var trapZoneRuleFailure = ValidateShelterTrapZoneMutation(severity, createNewZone);
+        if (trapZoneRuleFailure is not null)
+        {
+            StatusMessage?.Invoke(this, trapZoneRuleFailure);
+            return;
+        }
+
         PushUndoSnapshot();
         UpsertTrapZoneFromSelection(zoneLabel, severity, zoneNotes);
         RaiseProjectChanged();
@@ -1264,6 +1438,13 @@ public sealed class PlannerCanvas : Control
         if (trapZone is null)
         {
             StatusMessage?.Invoke(this, "Select a valid trap zone first.");
+            return;
+        }
+
+        var trapZoneRuleFailure = ValidateShelterTrapZoneMutation(severity, false);
+        if (trapZoneRuleFailure is not null)
+        {
+            StatusMessage?.Invoke(this, trapZoneRuleFailure);
             return;
         }
 
@@ -1596,11 +1777,7 @@ public sealed class PlannerCanvas : Control
             return;
         }
 
-        using var ingressBrush = new SolidBrush(Color.FromArgb(220, 92, 214, 128));
-        using var checkpointBrush = new SolidBrush(Color.FromArgb(220, 255, 210, 92));
-        using var egressBrush = new SolidBrush(Color.FromArgb(220, 92, 168, 255));
         using var borderPen = new Pen(Color.FromArgb(230, 242, 242, 242), 1.3f);
-        using var routePen = new Pen(Color.FromArgb(180, 160, 232, 196), 1.5f) { DashStyle = DashStyle.DashDot };
         using var labelBrush = new SolidBrush(Color.FromArgb(228, 238, 242));
         using var labelFont = new Font("Segoe UI", Math.Max(7.5f, cell / 5.5f), FontStyle.Bold);
 
@@ -1610,17 +1787,14 @@ public sealed class PlannerCanvas : Control
             .ToList();
 
         PointF? previousPoint = centerPx;
+        VisitorMarker? previousMarker = null;
         foreach (var marker in orderedMarkers)
         {
             var px = origin.X + ((marker.X + 0.5f) * cell);
             var py = origin.Y + ((marker.Y + 0.5f) * cell);
             var rect = new RectangleF(px - 6f, py - 6f, 12f, 12f);
-            var brush = marker.Type switch
-            {
-                VisitorMarkerType.Ingress => ingressBrush,
-                VisitorMarkerType.Egress => egressBrush,
-                _ => checkpointBrush
-            };
+            var ingressCovered = marker.Type != VisitorMarkerType.Ingress || IsMarkerCoveredByAnyTurret(marker);
+            using var brush = GetMarkerBrush(marker, ingressCovered);
 
             g.FillEllipse(brush, rect);
             g.DrawEllipse(borderPen, rect);
@@ -1629,6 +1803,7 @@ public sealed class PlannerCanvas : Control
             var point = GetMarkerPixel(origin, cell, marker);
             if (previousPoint is not null)
             {
+                using var routePen = new Pen(GetRouteSegmentColor(previousMarker, marker), 1.8f) { DashStyle = DashStyle.DashDot };
                 g.DrawLine(routePen, previousPoint.Value, point);
             }
 
@@ -1640,7 +1815,97 @@ public sealed class PlannerCanvas : Control
             }
 
             previousPoint = point;
+            previousMarker = marker;
         }
+    }
+
+    private SolidBrush GetMarkerBrush(VisitorMarker marker, bool ingressCovered)
+    {
+        if (marker.Type == VisitorMarkerType.Ingress)
+        {
+            return ingressCovered
+                ? new SolidBrush(Color.FromArgb(228, 92, 214, 128))
+                : new SolidBrush(Color.FromArgb(232, 245, 110, 98));
+        }
+
+        return marker.Type switch
+        {
+            VisitorMarkerType.Egress => new SolidBrush(Color.FromArgb(224, 92, 168, 255)),
+            _ => new SolidBrush(Color.FromArgb(224, 255, 210, 92))
+        };
+    }
+
+    private Color GetRouteSegmentColor(VisitorMarker? fromMarker, VisitorMarker toMarker)
+    {
+        var fromSeverity = fromMarker is null ? TrapZoneSeverity.Low : GetTrapSeverityAtPoint(fromMarker.X, fromMarker.Y);
+        var toSeverity = GetTrapSeverityAtPoint(toMarker.X, toMarker.Y);
+        var severity = (TrapZoneSeverity)Math.Max((int)fromSeverity, (int)toSeverity);
+
+        return severity switch
+        {
+            TrapZoneSeverity.Critical => Color.FromArgb(212, 255, 92, 92),
+            TrapZoneSeverity.High => Color.FromArgb(204, 255, 148, 102),
+            TrapZoneSeverity.Medium => Color.FromArgb(194, 235, 198, 108),
+            _ => Color.FromArgb(180, 160, 232, 196)
+        };
+    }
+
+    private TrapZoneSeverity GetTrapSeverityAtPoint(int x, int y)
+    {
+        var zone = _project.TrapZones
+            .Where(z => x >= z.X && y >= z.Y && x < z.X + Math.Max(1, z.Width) && y < z.Y + Math.Max(1, z.Height))
+            .OrderByDescending(z => z.Severity)
+            .FirstOrDefault();
+
+        return zone?.Severity ?? TrapZoneSeverity.Low;
+    }
+
+    private bool IsMarkerCoveredByAnyTurret(VisitorMarker marker)
+        => _project.Items.Any(item => IsTurret(item) && IsMarkerCoveredByTurret(marker, item));
+
+    private static bool IsTurret(PlacedItem item)
+        => Catalog.ById.TryGetValue(item.DefinitionId, out var definition) && definition.Id == "turret";
+
+    private static bool IsMarkerCoveredByTurret(VisitorMarker marker, PlacedItem turret)
+    {
+        const double rangeCells = 6.5;
+        const double halfSweep = 60d;
+
+        var dx = (marker.X + 0.5) - (turret.X + 0.5);
+        var dy = (marker.Y + 0.5) - (turret.Y + 0.5);
+        var distance = Math.Sqrt((dx * dx) + (dy * dy));
+        if (distance > rangeCells)
+        {
+            return false;
+        }
+
+        var markerAngle = Math.Atan2(dy, dx) * 180d / Math.PI;
+        var turretAngle = turret.Rotation switch
+        {
+            0 => -90d,
+            90 => 0d,
+            180 => 90d,
+            270 => 180d,
+            _ => -90d
+        };
+
+        var delta = NormalizeAngle(markerAngle - turretAngle);
+        return Math.Abs(delta) <= halfSweep;
+    }
+
+    private static double NormalizeAngle(double angle)
+    {
+        while (angle > 180d)
+        {
+            angle -= 360d;
+        }
+
+        while (angle < -180d)
+        {
+            angle += 360d;
+        }
+
+        return angle;
     }
 
     private Point? GetMarkerAnchorPoint()
@@ -1872,12 +2137,14 @@ public sealed class PlannerCanvas : Control
     {
         if (!_hoverGridValid || CurrentTool is ToolType.Select or ToolType.Erase)
         {
+            _placementPreviewMessage = null;
             return;
         }
 
         var definition = Catalog.GetForTool(CurrentTool);
         if (definition is null)
         {
+            _placementPreviewMessage = null;
             return;
         }
 
@@ -1895,6 +2162,7 @@ public sealed class PlannerCanvas : Control
         var size = GetSize(definition, preview.Rotation);
         var rect = new Rectangle(origin.X + preview.X * cell, origin.Y + preview.Y * cell, size.Width * cell, size.Height * cell);
         var ok = reason is null;
+        _placementPreviewMessage = ok ? "Placement valid." : reason;
 
         using var fill = new SolidBrush(Color.FromArgb(ok ? 74 : 96, ok ? 90 : 220, ok ? 210 : 90, ok ? 130 : 90));
         using var pen = new Pen(Color.FromArgb(ok ? 235 : 250, ok ? 90 : 220, ok ? 210 : 90, ok ? 130 : 90), 2.2f) { DashStyle = DashStyle.Dash };
@@ -1920,6 +2188,10 @@ public sealed class PlannerCanvas : Control
         var right = _project.Items.Count == 0
             ? "First run: place foundations, then move through Layout → Envelope → Systems → Defense → Polish."
             : "Ctrl+Click multi-select   •   R rotate   •   Del remove   •   +/- zoom";
+        if (!string.IsNullOrWhiteSpace(_placementPreviewMessage) && CurrentTool is not ToolType.Select and not ToolType.Erase)
+        {
+            right = _placementPreviewMessage;
+        }
         g.DrawString(left, font, accentBrush, new RectangleF(origin.X, y, totalWidth * 0.5f, 18));
 
         var sf = new StringFormat { Alignment = StringAlignment.Far };
@@ -1989,7 +2261,7 @@ public sealed class PlannerCanvas : Control
     {
         var preset = PresetLibrary.GetById(_project.PresetId).Name;
         var loadedBlueprint = _loadedBlueprint is null ? "No blueprint loaded" : $"Blueprint: {_loadedBlueprint.Name}";
-        var primary = $"{_project.Name}  •  {preset}  •  {_project.Mode}  •  {_project.RuleProfile}";
+        var primary = $"{_project.Name}  •  {preset}  •  {_project.Mode}  •  {_project.RuleProfile}  •  Snap {_project.SnapMode}";
         var secondary = $"Grid {_project.GridWidth}x{_project.GridHeight}  •  Zoom {ZoomPercent}%  •  Tool {CurrentTool}  •  Sel {_selectedIds.Count}  •  {loadedBlueprint}";
 
         using var titleFont = new Font("Segoe UI Semibold", 9.5f, FontStyle.Bold);
@@ -2096,12 +2368,27 @@ public sealed class PlannerCanvas : Control
             return "Budget exceeded. Increase limit or remove items.";
         }
 
+        if (TryGetActiveShelterRuleSpec(out var shelterRule))
+        {
+            var existingTurretCount = _project.Items.Count(x =>
+                !ignoreIds.Contains(x.Id)
+                && Catalog.ById.TryGetValue(x.DefinitionId, out var def)
+                && def.Id == "turret");
+
+            var candidateTurretCount = candidateItems.Count(x => Catalog.ById[x.DefinitionId].Id == "turret");
+            if (existingTurretCount + candidateTurretCount > shelterRule.MaxTurrets)
+            {
+                var presetName = PresetLibrary.GetById(_project.PresetId).Name;
+                return $"{presetName} allows up to {shelterRule.MaxTurrets} turrets.";
+            }
+        }
+
         return null;
     }
 
     private bool HasRequiredSupport(PlacedItem item, ItemDefinition definition, HashSet<Guid> ignoreIds, IReadOnlyDictionary<Guid, PlacedItem> candidates)
     {
-        if (_project.Mode == BuildMode.Shelter || _project.RuleProfile == RuleProfile.Shelter)
+        if (_project.Mode == BuildMode.Shelter)
         {
             return true;
         }
@@ -2222,10 +2509,12 @@ public sealed class PlannerCanvas : Control
     private PlacedItem ApplySmartSnap(PlacedItem sourceItem, ItemDefinition definition)
     {
         var item = ClonePlacedItem(sourceItem);
-        if (!_project.SnapEnabled)
+        if (_project.SnapMode == SnapMode.Off)
         {
             return item;
         }
+
+        var relaxed = _project.SnapMode == SnapMode.Relaxed;
 
         if (_project.Items.Count == 0)
         {
@@ -2235,7 +2524,7 @@ public sealed class PlannerCanvas : Control
         if (definition.Id is "wall" or "door")
         {
             var candidate = FindNearestFoundationEdgeAnchor(item.X, item.Y);
-            if (candidate is not null)
+            if (candidate is not null && (!relaxed || DistanceSquared(candidate.Value.X, candidate.Value.Y, sourceItem.X, sourceItem.Y) <= 9))
             {
                 item.X = candidate.Value.X;
                 item.Y = candidate.Value.Y;
@@ -2245,7 +2534,7 @@ public sealed class PlannerCanvas : Control
         else if (definition.Id == "roof")
         {
             var candidate = FindNearestFoundationCell(item.X, item.Y);
-            if (candidate is not null)
+            if (candidate is not null && (!relaxed || DistanceSquared(candidate.Value.X, candidate.Value.Y, sourceItem.X, sourceItem.Y) <= 9))
             {
                 item.X = candidate.Value.X;
                 item.Y = candidate.Value.Y;
@@ -2254,7 +2543,7 @@ public sealed class PlannerCanvas : Control
         else if (definition.Id == "stairs")
         {
             var candidate = FindNearestStairAnchor(item.X, item.Y, definition, item.Rotation);
-            if (candidate is not null)
+            if (candidate is not null && (!relaxed || DistanceSquared(candidate.Value.X, candidate.Value.Y, sourceItem.X, sourceItem.Y) <= 9))
             {
                 item.X = candidate.Value.X;
                 item.Y = candidate.Value.Y;
@@ -2483,6 +2772,70 @@ public sealed class PlannerCanvas : Control
         var dx = x1 - x2;
         var dy = y1 - y2;
         return (dx * dx) + (dy * dy);
+    }
+
+    private bool TryGetActiveShelterRuleSpec(out ShelterRuleLibrary.ShelterRuleSpec spec)
+    {
+        if (_project.Mode == BuildMode.Shelter && ShelterRuleLibrary.TryGetForPreset(_project.PresetId, out spec))
+        {
+            return true;
+        }
+
+        spec = null!;
+        return false;
+    }
+
+    private string? ValidateShelterVisitorMarkerAddition()
+    {
+        if (!TryGetActiveShelterRuleSpec(out var shelterRule))
+        {
+            return null;
+        }
+
+        if (_project.VisitorMarkers.Count >= shelterRule.MaxVisitorMarkers)
+        {
+            var presetName = PresetLibrary.GetById(_project.PresetId).Name;
+            return $"{presetName} allows up to {shelterRule.MaxVisitorMarkers} route markers.";
+        }
+
+        return null;
+    }
+
+    private string? ValidateShelterTrapZoneMutation(TrapZoneSeverity severity, bool createNewZone)
+    {
+        if (!TryGetActiveShelterRuleSpec(out var shelterRule))
+        {
+            return null;
+        }
+
+        if (severity > shelterRule.MaxTrapSeverity)
+        {
+            var presetName = PresetLibrary.GetById(_project.PresetId).Name;
+            return $"{presetName} allows trap severity up to {shelterRule.MaxTrapSeverity}.";
+        }
+
+        if (createNewZone && _project.TrapZones.Count >= shelterRule.MaxTrapZones)
+        {
+            var presetName = PresetLibrary.GetById(_project.PresetId).Name;
+            return $"{presetName} allows up to {shelterRule.MaxTrapZones} trap zones.";
+        }
+
+        return null;
+    }
+
+    private bool SelectionWouldCreateNewTrapZone()
+    {
+        var bounds = GetSelectionBounds();
+        if (bounds is null)
+        {
+            return false;
+        }
+
+        return !_project.TrapZones.Any(zone =>
+            zone.X == bounds.Value.X
+            && zone.Y == bounds.Value.Y
+            && zone.Width == bounds.Value.Width
+            && zone.Height == bounds.Value.Height);
     }
 
     private void UpsertTrapZoneFromSelection(string? zoneLabel, TrapZoneSeverity severity, string? zoneNotes)

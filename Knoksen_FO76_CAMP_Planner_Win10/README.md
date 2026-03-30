@@ -37,9 +37,15 @@ Dette er et viderebygget fundament for et Fallout 76 CAMP-planleggingsverktøy f
   - ordered route-path editor with editable marker labels og sekvens
   - structured trap zones med severity, bounds og egne review-notater
 - **Layer lock** i tillegg til layer hide
-- **Snap toggle**
-  - slå smart snapping av/på i Rules-seksjonen
-  - hurtig-toggle i verktøylinjen
+- **Device Hub / Quick Launch Center**
+  - plattformgrupper for PC, Mobile Companion og Console
+  - store knapper for hurtigåpning av prosjekt-/release-mapper, GitHub, SourceForge og docs
+  - mobil-workflow for kompakt prosjektsammendrag, snapshot-pack (PNG + summary) og QR-ready linkfil
+  - konsollsnarveier (Xbox/PlayStation/Generic) med konfigurerbare mål/lenker/notater
+  - deaktiverte handlinger med forklarende tooltip ved manglende target
+- **Snap mode (Strict / Relaxed / Off)**
+  - velg snap-opplevelse direkte i Rules-seksjonen
+  - hurtigsyklus i verktøylinjen (`Snap`)
 - **Budget profiles per playstyle**
   - Builder
   - Trap CAMP
@@ -72,6 +78,8 @@ Denne versjonen har også et enkelt analyse-lag for planlegging, ikke som en eks
 - **Layer lock** lar deg fryse hele lag mens du jobber videre på andre systemer
 - **Visitor flow** viser foreslåtte hovedlinjer fra CAMP center til funksjonelle mål som dører, workbench og vendor
 - **Trap zones** viser risiko-/forsvarssoner rundt trap-/defense-elementer
+- **Defense analysis summary** viser en omtrentlig score (`0-100`), ingress coverage (`covered/total`) og konkrete risikohint for svake vinkler/udekkede ruter
+- **Scenario compare (A/B)** lar deg lagre baseline i Analysis-panelet og sammenligne nåværende plan mot baseline (score, budget og ingress coverage)
 - **Route planning editor** lar deg:
   - bygge en rekkefølge av ingress → checkpoints → egress
   - gi hvert punkt eget navn og justere rekkefølgen direkte i UI
@@ -100,6 +108,43 @@ I tillegg er noen kategorier bevisst blokkert i Shelter-modus for å ligge nærm
 - Resource
 - Display
 - Ally
+
+## Device Hub / Quick Launch Center
+
+Device Hub er en praktisk launch- og companion-seksjon i WinForms-appen, ikke en egen app.
+
+Støttede førsteversjonshandlinger:
+- PC Tools
+  - Open project folder
+  - Open release folder
+  - Launch `FO76CampPlanner.exe` (hvis publish-fil finnes)
+  - Open GitHub repository
+  - Open SourceForge page (hvis konfigurert)
+  - Open Fallout docs/resources (URL eller lokal filsti)
+- Mobile Companion
+  - Open mobile export folder
+  - Export project summary (mobilvennlig tekst)
+  - Generate snapshot pack (PNG + summary)
+  - Open compact presentation view
+  - Generate QR-ready links file (for videre QR-generering)
+- Console Shortcuts
+  - Xbox
+  - PlayStation
+  - Generic Console
+
+Konfigurasjon og lagring:
+- Launch targets lagres per prosjekt i JSON (`deviceHub` i `PlannerProject`).
+- Targets kan være URL, lokal filsti eller placeholder for fremtidig integrasjon.
+- Konsollseksjonen er designet som konfigurerbar handlingspanel siden direkte launch til konsoll ikke alltid er mulig fra desktop.
+
+Begrensninger i v1:
+- Ingen direkte innebygd QR-renderer; appen genererer QR-ready linkfil.
+- Direkte konsoll-launch er avhengig av eksterne mål/URL-er som brukeren konfigurerer.
+
+Videre utvidelsessti:
+1. Egen innstilling for flere profiler (streaming/testing/release).
+2. QR-bildegenerering direkte i appen.
+3. Mer avansert deling (pakker med metadata + versjonshistorikk).
 
 ## Presets som følger med
 
@@ -181,13 +226,27 @@ Prosjektet er satt opp for single-file Windows-publisering, men selve `.exe` må
 ## v1.1/v1.2 progression (in progress)
 
 - Quick-duplicate zones er nå tilgjengelig i både toolbar og quick actions (`Dup ←/→/↑/↓`)
+- Trap zones kan også hurtigdupliseres retningsstyrt (`Dup zone ←/→/↑/↓`) i route/trap-seksjonen
 - Blueprint library per CAMP-slot er funksjonell for in-memory moduler i prosjektet
-- Snap toggle finnes både i Rules-seksjonen og som toolbar-knapp
+- Snap mode finnes både i Rules-seksjonen og som toolbar-knapp (`Strict → Relaxed → Off`)
 - Visitor flow og trap zones har egne analyse-overlays med toggles
 - Visitor flow kan nå planlegges med egne ingress-, checkpoint- og egress-markører som lagres i prosjektet
 - Trap zone tagging finnes i Inspector quick actions
+- Inspector støtter nå nudge-kontroller for presis flytting av valgt element
+- Placement preview viser tydeligere årsak i footer når plassering blokkeres
+- Multi-select rotasjon bruker nå gruppepivot for mer forutsigbar modulspinning
 - Overlay review presets gjør det raskere å bytte mellom visitor flow-, trap- og defense-gjennomganger
 - Budget profiles per playstyle er koblet direkte til budsjettstyring i UI
+- Defense analysis bruker nå profile-aware mål for turrets/defense/ingress/trap-zones
+- Route-panel viser tydelig ingress/checkpoint/egress-komposisjon og markører i high/critical trap-zones
+- Ved mode-bytte håndheves Shelter vs Surface tydeligere (rule profile, overlay, og inkompatible objekter)
+- Visitor-flow visualisering markerer ingress med coverage-status og farger rutesegmenter etter trap-severity
+- Release tooling inkluderer nå manifest-generator med SHA256 og filstørrelser (`GENERATE_RELEASE_MANIFEST.ps1`)
+- Shelter presets håndhever nå konkrete caps for turrets, route markers, trap zones og maksimal trap severity
+- Route/Trap-panelet viser nå shelter-advisory med cap headroom og fallback-anbefalinger før caps nås
+- Route/Trap-actions soft-disables nå ved shelter-cap (marker/zone-cap og severity-cap) for å redusere avviste handlinger
+- Deaktiverte Route/Trap-actions viser nå forklarende tooltip med konkret shelter-begrensning
+- Route/Trap-panelet viser nå en inline cap meter med live bars (`Markers`, `Zones`, `Max severity`) og tydelig warn/error-farge ved cap-pressure
 
 
 ## v7 UI/UX and workflow improvements

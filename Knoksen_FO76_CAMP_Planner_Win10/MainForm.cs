@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Text.Json;
 
 namespace FO76CampPlanner;
@@ -15,10 +16,14 @@ public sealed class MainForm : Form
     private readonly Label _analysisLabel = new();
     private readonly Label _budgetProfileLabel = new();
     private readonly Label _routePlanningLabel = new();
+    private readonly Label _shelterRuleLabel = new();
+    private readonly Label _capMeterLabel = new();
     private readonly Label _workflowLabel = new();
     private readonly Label _focusLabel = new();
     private readonly Label _quickStartLabel = new();
     private readonly Label _inspectorHintLabel = new();
+    private readonly Label _deviceHubStatusLabel = new();
+    private readonly Label _deviceHubConfigLabel = new();
     private readonly Label _overviewHeroLabel = new();
     private readonly Label _overviewMetaLabel = new();
     private readonly Label _statusCardLabel = new();
@@ -33,12 +38,12 @@ public sealed class MainForm : Form
     private readonly NumericUpDown _inspectorRotationInput = new();
     private readonly ComboBox _modeCombo = new();
     private readonly ComboBox _ruleCombo = new();
+    private readonly ComboBox _snapModeCombo = new();
     private readonly ComboBox _presetCombo = new();
     private readonly ComboBox _budgetProfileCombo = new();
     private readonly ComboBox _overlayPresetCombo = new();
     private readonly ComboBox _markerTypeCombo = new();
     private readonly ComboBox _trapZoneSeverityCombo = new();
-    private readonly CheckBox _snapEnabledCheck = new();
     private readonly ComboBox _campSlotCombo = new();
     private readonly ListBox _blueprintLibraryList = new();
     private readonly ListBox _visitorMarkerList = new();
@@ -51,6 +56,15 @@ public sealed class MainForm : Form
     private readonly TextBox _trapZoneLabelText = new();
     private readonly TextBox _trapZoneNotesText = new();
     private readonly TextBox _defenseReviewNotesText = new();
+    private readonly TextBox _deviceHubGitHubText = new();
+    private readonly TextBox _deviceHubSourceForgeText = new();
+    private readonly TextBox _deviceHubDocsText = new();
+    private readonly TextBox _deviceHubMobileLinkText = new();
+    private readonly TextBox _deviceHubMobileFolderText = new();
+    private readonly TextBox _deviceHubXboxTargetText = new();
+    private readonly TextBox _deviceHubPlayStationTargetText = new();
+    private readonly TextBox _deviceHubGenericConsoleTargetText = new();
+    private readonly TextBox _deviceHubConsoleNotesText = new();
     private readonly MinimapPanel _minimap = new();
     private readonly StatusStrip _statusStrip = new();
     private readonly ToolStripStatusLabel _statusLabel = new("Ready.");
@@ -58,6 +72,32 @@ public sealed class MainForm : Form
     private readonly Dictionary<LayerType, CheckBox> _layerChecks = new();
     private readonly Dictionary<LayerType, CheckBox> _layerLockChecks = new();
     private readonly Dictionary<string, Button> _workflowButtons = new();
+    private readonly ToolTip _routeActionToolTip = new();
+    private readonly ToolTip _deviceHubToolTip = new();
+    private Button? _addIngressButton;
+    private Button? _addCheckpointButton;
+    private Button? _addEgressButton;
+    private Button? _zoneFunnelButton;
+    private Button? _zoneKillBoxButton;
+    private Button? _zoneDelayButton;
+    private Button? _dupZoneLeftButton;
+    private Button? _dupZoneRightButton;
+    private Button? _dupZoneUpButton;
+    private Button? _dupZoneDownButton;
+    private Button? _hubOpenProjectFolderButton;
+    private Button? _hubOpenReleaseFolderButton;
+    private Button? _hubLaunchExeButton;
+    private Button? _hubOpenGitHubButton;
+    private Button? _hubOpenSourceForgeButton;
+    private Button? _hubOpenDocsButton;
+    private Button? _hubOpenMobileExportFolderButton;
+    private Button? _hubExportMobileSummaryButton;
+    private Button? _hubGenerateSnapshotPackButton;
+    private Button? _hubOpenCompactViewButton;
+    private Button? _hubGenerateQrLinksButton;
+    private Button? _hubOpenXboxButton;
+    private Button? _hubOpenPlayStationButton;
+    private Button? _hubOpenGenericConsoleButton;
 
     private ToolStripButton? _undoButton;
     private ToolStripButton? _redoButton;
@@ -68,6 +108,7 @@ public sealed class MainForm : Form
     private string? _currentPath;
     private bool _suppressUiEvents;
     private bool _isDirty;
+    private ScenarioSnapshot? _scenarioBaseline;
 
     private static readonly Color BgApp = Color.FromArgb(18, 22, 28);
     private static readonly Color BgPanel = Color.FromArgb(27, 33, 41);
@@ -82,6 +123,17 @@ public sealed class MainForm : Form
     private static readonly Color BgHover = Color.FromArgb(46, 54, 66);
     private static readonly Color BgPressed = Color.FromArgb(41, 48, 58);
     private static readonly Color StatusOk = Color.FromArgb(112, 211, 138);
+
+    private sealed record ScenarioSnapshot(
+        int ItemCount,
+        int PlacedBudget,
+        int TurretCount,
+        int DefenseItemCount,
+        int MarkerCount,
+        int TrapZoneCount,
+        int IngressCount,
+        int DefendedIngressCount,
+        int DefenseScore);
 
     public MainForm()
     {
@@ -340,16 +392,19 @@ public sealed class MainForm : Form
         var buildPage = MakeTabPage("Build");
         var libraryPage = MakeTabPage("Library");
         var inspectPage = MakeTabPage("Inspect");
+        var deviceHubPage = MakeTabPage("Device Hub");
 
         overviewPage.Controls.Add(BuildOverviewTab());
         buildPage.Controls.Add(BuildBuildTab());
         libraryPage.Controls.Add(BuildLibraryTab());
         inspectPage.Controls.Add(BuildInspectTab());
+        deviceHubPage.Controls.Add(BuildDeviceHubTab());
 
         tabs.TabPages.Add(overviewPage);
         tabs.TabPages.Add(buildPage);
         tabs.TabPages.Add(libraryPage);
         tabs.TabPages.Add(inspectPage);
+        tabs.TabPages.Add(deviceHubPage);
 
         panel.Controls.Add(tabs);
         return panel;
@@ -407,6 +462,197 @@ public sealed class MainForm : Form
         layout.Controls.Add(MakeSection("Inspector", BuildInspectorSection()), 0, 1);
         layout.Controls.Add(MakeSection("Quick Actions", BuildInspectorActionsSection()), 0, 2);
         return layout;
+    }
+
+    private Control BuildDeviceHubTab()
+    {
+        var layout = BuildTabLayout();
+        layout.Controls.Add(MakeSection("PC", BuildDeviceHubPcSection()), 0, 0);
+        layout.Controls.Add(MakeSection("Mobile Companion", BuildDeviceHubMobileSection()), 0, 1);
+        layout.Controls.Add(MakeSection("Console", BuildDeviceHubConsoleSection()), 0, 2);
+        layout.Controls.Add(MakeSection("Launch Config", BuildDeviceHubConfigSection()), 0, 3);
+        return layout;
+    }
+
+    private Control BuildDeviceHubPcSection()
+    {
+        var flow = BuildVerticalFlow();
+
+        var row1 = new FlowLayoutPanel
+        {
+            AutoSize = true,
+            WrapContents = false,
+            FlowDirection = FlowDirection.LeftToRight,
+            Margin = new Padding(0, 6, 0, 0),
+            BackColor = Color.Transparent
+        };
+        _hubOpenProjectFolderButton = BuildHubActionButton("PC", "Open project folder", (_, _) => OpenDeviceHubProjectFolder());
+        _hubOpenReleaseFolderButton = BuildHubActionButton("PC", "Open release folder", (_, _) => OpenDeviceHubReleaseFolder());
+        row1.Controls.Add(_hubOpenProjectFolderButton);
+        row1.Controls.Add(_hubOpenReleaseFolderButton);
+
+        var row2 = new FlowLayoutPanel
+        {
+            AutoSize = true,
+            WrapContents = false,
+            FlowDirection = FlowDirection.LeftToRight,
+            Margin = new Padding(0, 6, 0, 0),
+            BackColor = Color.Transparent
+        };
+        _hubLaunchExeButton = BuildHubActionButton("PC", "Launch FO76CampPlanner.exe", (_, _) => LaunchDeviceHubExecutable());
+        _hubOpenGitHubButton = BuildHubActionButton("PC", "Open GitHub", (_, _) => OpenDeviceHubGitHub());
+        row2.Controls.Add(_hubLaunchExeButton);
+        row2.Controls.Add(_hubOpenGitHubButton);
+
+        var row3 = new FlowLayoutPanel
+        {
+            AutoSize = true,
+            WrapContents = false,
+            FlowDirection = FlowDirection.LeftToRight,
+            Margin = new Padding(0, 6, 0, 0),
+            BackColor = Color.Transparent
+        };
+        _hubOpenSourceForgeButton = BuildHubActionButton("PC", "Open SourceForge", (_, _) => OpenDeviceHubSourceForge());
+        _hubOpenDocsButton = BuildHubActionButton("PC", "Open Fallout docs", (_, _) => OpenDeviceHubDocs());
+        row3.Controls.Add(_hubOpenSourceForgeButton);
+        row3.Controls.Add(_hubOpenDocsButton);
+
+        flow.Controls.Add(row1);
+        flow.Controls.Add(row2);
+        flow.Controls.Add(row3);
+        return flow;
+    }
+
+    private Control BuildDeviceHubMobileSection()
+    {
+        var flow = BuildVerticalFlow();
+
+        var row1 = new FlowLayoutPanel
+        {
+            AutoSize = true,
+            WrapContents = false,
+            FlowDirection = FlowDirection.LeftToRight,
+            Margin = new Padding(0, 6, 0, 0),
+            BackColor = Color.Transparent
+        };
+        _hubOpenMobileExportFolderButton = BuildHubActionButton("Mobile", "Open mobile export folder", (_, _) => OpenDeviceHubMobileExportFolder());
+        _hubExportMobileSummaryButton = BuildHubActionButton("Mobile", "Export project summary", (_, _) => ExportMobileProjectSummary());
+        row1.Controls.Add(_hubOpenMobileExportFolderButton);
+        row1.Controls.Add(_hubExportMobileSummaryButton);
+
+        var row2 = new FlowLayoutPanel
+        {
+            AutoSize = true,
+            WrapContents = false,
+            FlowDirection = FlowDirection.LeftToRight,
+            Margin = new Padding(0, 6, 0, 0),
+            BackColor = Color.Transparent
+        };
+        _hubGenerateSnapshotPackButton = BuildHubActionButton("Mobile", "Generate snapshot pack", (_, _) => ExportMobileSnapshotPack());
+        _hubOpenCompactViewButton = BuildHubActionButton("Mobile", "Open compact presentation", (_, _) => OpenCompactPresentationView());
+        row2.Controls.Add(_hubGenerateSnapshotPackButton);
+        row2.Controls.Add(_hubOpenCompactViewButton);
+
+        var row3 = new FlowLayoutPanel
+        {
+            AutoSize = true,
+            WrapContents = false,
+            FlowDirection = FlowDirection.LeftToRight,
+            Margin = new Padding(0, 6, 0, 0),
+            BackColor = Color.Transparent
+        };
+        _hubGenerateQrLinksButton = BuildHubActionButton("Mobile", "Generate QR-ready links", (_, _) => GenerateMobileQrLinks());
+        row3.Controls.Add(_hubGenerateQrLinksButton);
+
+        flow.Controls.Add(row1);
+        flow.Controls.Add(row2);
+        flow.Controls.Add(row3);
+        return flow;
+    }
+
+    private Control BuildDeviceHubConsoleSection()
+    {
+        var flow = BuildVerticalFlow();
+
+        var row = new FlowLayoutPanel
+        {
+            AutoSize = true,
+            WrapContents = true,
+            FlowDirection = FlowDirection.LeftToRight,
+            Margin = new Padding(0, 6, 0, 0),
+            BackColor = Color.Transparent,
+            Width = 300
+        };
+        _hubOpenXboxButton = BuildHubActionButton("Console", "Xbox", (_, _) => OpenDeviceHubConsoleTarget("Xbox"));
+        _hubOpenPlayStationButton = BuildHubActionButton("Console", "PlayStation", (_, _) => OpenDeviceHubConsoleTarget("PlayStation"));
+        _hubOpenGenericConsoleButton = BuildHubActionButton("Console", "Generic Console", (_, _) => OpenDeviceHubConsoleTarget("Generic"));
+        row.Controls.Add(_hubOpenXboxButton);
+        row.Controls.Add(_hubOpenPlayStationButton);
+        row.Controls.Add(_hubOpenGenericConsoleButton);
+
+        _deviceHubStatusLabel.AutoSize = true;
+        _deviceHubStatusLabel.MaximumSize = new Size(300, 0);
+        _deviceHubStatusLabel.ForeColor = TextSecondary;
+
+        flow.Controls.Add(row);
+        flow.Controls.Add(BuildInfoPill(_deviceHubStatusLabel));
+        return flow;
+    }
+
+    private Control BuildDeviceHubConfigSection()
+    {
+        var flow = BuildVerticalFlow();
+
+        _deviceHubConfigLabel.AutoSize = true;
+        _deviceHubConfigLabel.MaximumSize = new Size(300, 0);
+        _deviceHubConfigLabel.ForeColor = TextSecondary;
+
+        _deviceHubGitHubText.Width = 300;
+        _deviceHubSourceForgeText.Width = 300;
+        _deviceHubDocsText.Width = 300;
+        _deviceHubMobileLinkText.Width = 300;
+        _deviceHubMobileFolderText.Width = 300;
+        _deviceHubXboxTargetText.Width = 300;
+        _deviceHubPlayStationTargetText.Width = 300;
+        _deviceHubGenericConsoleTargetText.Width = 300;
+        _deviceHubConsoleNotesText.Width = 300;
+        _deviceHubConsoleNotesText.Height = 72;
+        _deviceHubConsoleNotesText.Multiline = true;
+        _deviceHubConsoleNotesText.ScrollBars = ScrollBars.Vertical;
+
+        flow.Controls.Add(BuildInfoPill(_deviceHubConfigLabel));
+        flow.Controls.Add(MakeLabel("GitHub repository URL"));
+        flow.Controls.Add(_deviceHubGitHubText);
+        flow.Controls.Add(MakeLabel("SourceForge URL"));
+        flow.Controls.Add(_deviceHubSourceForgeText);
+        flow.Controls.Add(MakeLabel("Fallout docs target (URL or file path)"));
+        flow.Controls.Add(_deviceHubDocsText);
+        flow.Controls.Add(MakeLabel("Mobile companion URL (optional)"));
+        flow.Controls.Add(_deviceHubMobileLinkText);
+        flow.Controls.Add(MakeLabel("Mobile export folder (relative or absolute)"));
+        flow.Controls.Add(_deviceHubMobileFolderText);
+        flow.Controls.Add(MakeLabel("Xbox target"));
+        flow.Controls.Add(_deviceHubXboxTargetText);
+        flow.Controls.Add(MakeLabel("PlayStation target"));
+        flow.Controls.Add(_deviceHubPlayStationTargetText);
+        flow.Controls.Add(MakeLabel("Generic console target"));
+        flow.Controls.Add(_deviceHubGenericConsoleTargetText);
+        flow.Controls.Add(MakeLabel("Console notes / instructions"));
+        flow.Controls.Add(_deviceHubConsoleNotesText);
+
+        var row = new FlowLayoutPanel
+        {
+            AutoSize = true,
+            WrapContents = false,
+            FlowDirection = FlowDirection.LeftToRight,
+            Margin = new Padding(0, 6, 0, 0),
+            BackColor = Color.Transparent
+        };
+        row.Controls.Add(BuildActionButton("Apply launch config", (_, _) => ApplyDeviceHubConfig(), true));
+        row.Controls.Add(BuildGhostButton("Open mobile link", (_, _) => OpenDeviceHubMobileCompanionLink()));
+        flow.Controls.Add(row);
+
+        return flow;
     }
 
     private static TableLayoutPanel BuildTabLayout()
@@ -665,18 +911,18 @@ public sealed class MainForm : Form
         _ruleCombo.Width = 300;
         _ruleCombo.DataSource = Enum.GetValues<RuleProfile>();
 
-        _snapEnabledCheck.Text = "Smart snap enabled";
-        _snapEnabledCheck.Checked = true;
-        _snapEnabledCheck.AutoSize = true;
-        _snapEnabledCheck.ForeColor = TextPrimary;
-        _snapEnabledCheck.BackColor = Color.Transparent;
-        _snapEnabledCheck.Margin = new Padding(0, 4, 0, 2);
-        _snapEnabledCheck.CheckedChanged += (_, _) =>
+        _snapModeCombo.DropDownStyle = ComboBoxStyle.DropDownList;
+        _snapModeCombo.Width = 300;
+        _snapModeCombo.DataSource = Enum.GetValues<SnapMode>();
+        _snapModeCombo.SelectedIndexChanged += (_, _) =>
         {
             if (_suppressUiEvents) return;
-            _canvas.Project.SnapEnabled = _snapEnabledCheck.Checked;
-            _canvas.Invalidate();
-            RefreshProjectUi();
+            if (_snapModeCombo.SelectedItem is SnapMode snapMode)
+            {
+                _canvas.Project.SnapMode = snapMode;
+                _canvas.Invalidate();
+                RefreshProjectUi();
+            }
         };
 
         _zoomInput.Minimum = 50;
@@ -688,7 +934,8 @@ public sealed class MainForm : Form
         flow.Controls.Add(_modeCombo);
         flow.Controls.Add(MakeLabel("Rule profile"));
         flow.Controls.Add(_ruleCombo);
-        flow.Controls.Add(_snapEnabledCheck);
+        flow.Controls.Add(MakeLabel("Snap mode"));
+        flow.Controls.Add(_snapModeCombo);
         flow.Controls.Add(MakeLabel("Zoom %"));
         flow.Controls.Add(_zoomInput);
         flow.Controls.Add(BuildInfoPill(_modeLabel));
@@ -793,10 +1040,22 @@ public sealed class MainForm : Form
         _analysisLabel.MaximumSize = new Size(300, 0);
         _analysisLabel.ForeColor = TextSecondary;
 
+        var compareRow = new FlowLayoutPanel
+        {
+            AutoSize = true,
+            WrapContents = false,
+            FlowDirection = FlowDirection.LeftToRight,
+            Margin = new Padding(0, 6, 0, 0),
+            BackColor = Color.Transparent
+        };
+        compareRow.Controls.Add(BuildGhostButton("Capture baseline", (_, _) => CaptureScenarioBaseline()));
+        compareRow.Controls.Add(BuildGhostButton("Clear baseline", (_, _) => ClearScenarioBaseline()));
+
         flow.Controls.Add(_showCampRadiusCheck);
         flow.Controls.Add(_showTurretCoverageCheck);
         flow.Controls.Add(_showVisitorFlowCheck);
         flow.Controls.Add(_showTrapZonesCheck);
+        flow.Controls.Add(compareRow);
         flow.Controls.Add(BuildInfoPill(_analysisLabel));
         return flow;
     }
@@ -853,6 +1112,14 @@ public sealed class MainForm : Form
         _routePlanningLabel.MaximumSize = new Size(300, 0);
         _routePlanningLabel.ForeColor = TextSecondary;
 
+        _shelterRuleLabel.AutoSize = true;
+        _shelterRuleLabel.MaximumSize = new Size(300, 0);
+        _shelterRuleLabel.ForeColor = Accent;
+
+        _capMeterLabel.AutoSize = true;
+        _capMeterLabel.MaximumSize = new Size(300, 0);
+        _capMeterLabel.ForeColor = TextSecondary;
+
         var markerRow1 = new FlowLayoutPanel
         {
             AutoSize = true,
@@ -861,8 +1128,10 @@ public sealed class MainForm : Form
             Margin = new Padding(0, 6, 0, 0),
             BackColor = Color.Transparent
         };
-        markerRow1.Controls.Add(BuildGhostButton("Add ingress", (_, _) => _canvas.AddVisitorMarker(VisitorMarkerType.Ingress)));
-        markerRow1.Controls.Add(BuildGhostButton("Add checkpoint", (_, _) => _canvas.AddVisitorMarker(VisitorMarkerType.Checkpoint)));
+        _addIngressButton = BuildGhostButton("Add ingress", (_, _) => _canvas.AddVisitorMarker(VisitorMarkerType.Ingress));
+        _addCheckpointButton = BuildGhostButton("Add checkpoint", (_, _) => _canvas.AddVisitorMarker(VisitorMarkerType.Checkpoint));
+        markerRow1.Controls.Add(_addIngressButton);
+        markerRow1.Controls.Add(_addCheckpointButton);
 
         var markerRow2 = new FlowLayoutPanel
         {
@@ -872,7 +1141,8 @@ public sealed class MainForm : Form
             Margin = new Padding(0, 6, 0, 0),
             BackColor = Color.Transparent
         };
-        markerRow2.Controls.Add(BuildGhostButton("Add egress", (_, _) => _canvas.AddVisitorMarker(VisitorMarkerType.Egress)));
+        _addEgressButton = BuildGhostButton("Add egress", (_, _) => _canvas.AddVisitorMarker(VisitorMarkerType.Egress));
+        markerRow2.Controls.Add(_addEgressButton);
         markerRow2.Controls.Add(BuildGhostButton("Apply marker", (_, _) => ApplySelectedVisitorMarker()));
 
         var markerRow3 = new FlowLayoutPanel
@@ -896,9 +1166,12 @@ public sealed class MainForm : Form
             BackColor = Color.Transparent,
             Width = 300
         };
-        trapRow.Controls.Add(BuildGhostButton("Zone: Funnel", (_, _) => CreateTrapZoneFromSelection("Funnel", TrapZoneSeverity.Medium)));
-        trapRow.Controls.Add(BuildGhostButton("Zone: Kill Box", (_, _) => CreateTrapZoneFromSelection("Kill Box", TrapZoneSeverity.Critical)));
-        trapRow.Controls.Add(BuildGhostButton("Zone: Delay", (_, _) => CreateTrapZoneFromSelection("Delay", TrapZoneSeverity.High)));
+        _zoneFunnelButton = BuildGhostButton("Zone: Funnel", (_, _) => CreateTrapZoneFromSelection("Funnel", TrapZoneSeverity.Medium));
+        _zoneKillBoxButton = BuildGhostButton("Zone: Kill Box", (_, _) => CreateTrapZoneFromSelection("Kill Box", TrapZoneSeverity.Critical));
+        _zoneDelayButton = BuildGhostButton("Zone: Delay", (_, _) => CreateTrapZoneFromSelection("Delay", TrapZoneSeverity.High));
+        trapRow.Controls.Add(_zoneFunnelButton);
+        trapRow.Controls.Add(_zoneKillBoxButton);
+        trapRow.Controls.Add(_zoneDelayButton);
 
         var trapRow2 = new FlowLayoutPanel
         {
@@ -912,9 +1185,37 @@ public sealed class MainForm : Form
         trapRow2.Controls.Add(BuildGhostButton("Remove zone", (_, _) => RemoveSelectedTrapZone()));
         trapRow2.Controls.Add(BuildGhostButton("Clear markers", (_, _) => _canvas.ClearVisitorMarkers()));
 
+        var trapRow3 = new FlowLayoutPanel
+        {
+            AutoSize = true,
+            WrapContents = false,
+            FlowDirection = FlowDirection.LeftToRight,
+            Margin = new Padding(0, 6, 0, 0),
+            BackColor = Color.Transparent
+        };
+        _dupZoneLeftButton = BuildGhostButton("Dup zone ←", (_, _) => QuickDuplicateSelectedTrapZone(-1, 0));
+        _dupZoneRightButton = BuildGhostButton("Dup zone →", (_, _) => QuickDuplicateSelectedTrapZone(1, 0));
+        trapRow3.Controls.Add(_dupZoneLeftButton);
+        trapRow3.Controls.Add(_dupZoneRightButton);
+
+        var trapRow4 = new FlowLayoutPanel
+        {
+            AutoSize = true,
+            WrapContents = false,
+            FlowDirection = FlowDirection.LeftToRight,
+            Margin = new Padding(0, 6, 0, 0),
+            BackColor = Color.Transparent
+        };
+        _dupZoneUpButton = BuildGhostButton("Dup zone ↑", (_, _) => QuickDuplicateSelectedTrapZone(0, -1));
+        _dupZoneDownButton = BuildGhostButton("Dup zone ↓", (_, _) => QuickDuplicateSelectedTrapZone(0, 1));
+        trapRow4.Controls.Add(_dupZoneUpButton);
+        trapRow4.Controls.Add(_dupZoneDownButton);
+
         flow.Controls.Add(MakeLabel("Overlay review preset"));
         flow.Controls.Add(_overlayPresetCombo);
         flow.Controls.Add(BuildInfoPill(_routePlanningLabel));
+        flow.Controls.Add(BuildInfoPill(_shelterRuleLabel));
+        flow.Controls.Add(BuildInfoPill(_capMeterLabel));
         flow.Controls.Add(MakeLabel("Route steps"));
         flow.Controls.Add(_visitorMarkerList);
         flow.Controls.Add(MakeLabel("Marker label"));
@@ -934,6 +1235,8 @@ public sealed class MainForm : Form
         flow.Controls.Add(_trapZoneNotesText);
         flow.Controls.Add(trapRow);
         flow.Controls.Add(trapRow2);
+        flow.Controls.Add(trapRow3);
+        flow.Controls.Add(trapRow4);
         flow.Controls.Add(MakeLabel("Defense review notes"));
         flow.Controls.Add(_defenseReviewNotesText);
         flow.Controls.Add(BuildGhostButton("Save review notes", (_, _) => ApplyDefenseReviewNotes()));
@@ -1083,6 +1386,31 @@ public sealed class MainForm : Form
         flow.Controls.Add(BuildActionButton("Rotate selection", (_, _) => _canvas.RotateSelected(), true));
         flow.Controls.Add(BuildActionButton("Duplicate selection", (_, _) => _canvas.DuplicateSelection()));
         flow.Controls.Add(BuildActionButton("Delete selection", (_, _) => _canvas.DeleteSelection()));
+        
+        var nudgeRow1 = new FlowLayoutPanel
+        {
+            AutoSize = true,
+            WrapContents = false,
+            FlowDirection = FlowDirection.LeftToRight,
+            Margin = new Padding(0, 6, 0, 0),
+            BackColor = Color.Transparent
+        };
+        nudgeRow1.Controls.Add(BuildGhostButton("Nudge ←", (_, _) => _canvas.NudgeSelection(-1, 0)));
+        nudgeRow1.Controls.Add(BuildGhostButton("Nudge →", (_, _) => _canvas.NudgeSelection(1, 0)));
+        
+        var nudgeRow2 = new FlowLayoutPanel
+        {
+            AutoSize = true,
+            WrapContents = false,
+            FlowDirection = FlowDirection.LeftToRight,
+            Margin = new Padding(0, 6, 0, 0),
+            BackColor = Color.Transparent
+        };
+        nudgeRow2.Controls.Add(BuildGhostButton("Nudge ↑", (_, _) => _canvas.NudgeSelection(0, -1)));
+        nudgeRow2.Controls.Add(BuildGhostButton("Nudge ↓", (_, _) => _canvas.NudgeSelection(0, 1)));
+        
+        flow.Controls.Add(nudgeRow1);
+        flow.Controls.Add(nudgeRow2);
         flow.Controls.Add(BuildGhostButton("Tag trap zone", (_, _) => _canvas.TagSelectionAsTrapZone(true)));
         flow.Controls.Add(BuildGhostButton("Clear trap tag", (_, _) => _canvas.TagSelectionAsTrapZone(false)));
         flow.Controls.Add(BuildGhostButton("Set CAMP center from selection", (_, _) => _canvas.SetCampCenterFromSelection()));
@@ -1234,6 +1562,17 @@ public sealed class MainForm : Form
 
     private Button BuildGhostButton(string text, EventHandler click)
         => BuildActionButton(text, click, false);
+
+    private Button BuildHubActionButton(string platform, string text, EventHandler click)
+    {
+        var button = BuildActionButton(text, click, true);
+        button.Width = 142;
+        button.Height = 48;
+        button.Margin = new Padding(0, 0, 8, 0);
+        button.TextAlign = ContentAlignment.MiddleCenter;
+        _deviceHubToolTip.SetToolTip(button, $"{platform}: {text}");
+        return button;
+    }
 
     private CheckBox BuildCheck(string text, bool isChecked, EventHandler click)
     {
@@ -1459,6 +1798,7 @@ public sealed class MainForm : Form
             if (_modeCombo.SelectedItem is BuildMode mode)
             {
                 _canvas.Project.Mode = mode;
+                EnforceModeConstraints();
                 RefreshProjectUi();
                 _canvas.Invalidate();
             }
@@ -1562,6 +1902,7 @@ public sealed class MainForm : Form
     {
         _currentPath = null;
         _isDirty = false;
+        _scenarioBaseline = null;
         _canvas.Project = PresetLibrary.GetById("custom").CreateProject();
         _canvas.Project.Name = "Knoksen Foundation Draft";
         SetActiveTool(ToolType.Foundation);
@@ -1582,6 +1923,7 @@ public sealed class MainForm : Form
 
         _currentPath = null;
         _isDirty = false;
+        _scenarioBaseline = null;
         _canvas.Project = preset.CreateProject();
         SetActiveTool(ToolType.Foundation);
         RefreshProjectUi();
@@ -1604,7 +1946,7 @@ public sealed class MainForm : Form
 
             _modeCombo.SelectedItem = project.Mode;
             _ruleCombo.SelectedItem = project.RuleProfile;
-            _snapEnabledCheck.Checked = project.SnapEnabled;
+            _snapModeCombo.SelectedItem = project.SnapMode;
             _campSlotCombo.SelectedItem = project.ActiveCampSlot;
             _budgetProfileCombo.SelectedItem = project.BudgetProfile;
             _overlayPresetCombo.SelectedItem = project.OverlayPreset;
@@ -1653,7 +1995,7 @@ public sealed class MainForm : Form
             _budgetProgress.Maximum = Math.Max(1, project.BudgetLimit);
             _budgetProgress.Value = Math.Max(0, Math.Min(_budgetProgress.Maximum, totalBudget));
             _budgetLabel.Text = $"Placed {placedBudget} • Stored {project.StoredBudget} • Total {totalBudget} / {project.BudgetLimit}";
-            _modeLabel.Text = $"Mode: {project.Mode}   •   Rules: {project.RuleProfile}   •   Tool: {_canvas.CurrentTool}\nTip: Use Workflow + Focus to keep each build pass clear.";
+            _modeLabel.Text = $"Mode: {project.Mode}   •   Rules: {project.RuleProfile}   •   Snap: {project.SnapMode}   •   Tool: {_canvas.CurrentTool}\nTip: Use Workflow + Focus to keep each build pass clear.";
 
             if (BudgetProfileLibrary.Profiles.TryGetValue(project.BudgetProfile, out var profilePreset))
             {
@@ -1675,6 +2017,7 @@ public sealed class MainForm : Form
             RefreshQuickStartUi();
             RefreshAnalysisUi();
             RefreshMinimapUi();
+            RefreshDeviceHubUi();
             UpdateWindowTitle();
         }
         finally
@@ -1875,8 +2218,8 @@ public sealed class MainForm : Form
             .Cast<ItemDefinition>()
             .ToList();
 
-        var structureCount = definitions.Count(x => x.Layer == LayerType.Structure);
         var foundationCount = definitions.Count(x => x.Id == "foundation");
+        var structureCount = definitions.Count(x => x.Layer == LayerType.Structure);
         var systemCount = definitions.Count(x => x.Layer is LayerType.Utility or LayerType.Power);
         var defenseCount = definitions.Count(x => x.Layer == LayerType.Defense);
         var polishCount = definitions.Count(x => x.Layer is LayerType.Aesthetic or LayerType.Commerce);
@@ -1922,6 +2265,360 @@ public sealed class MainForm : Form
         _minimap.SelectedItemIds = _canvas.SelectedItems.Select(x => x.Id).ToHashSet();
         _minimap.HoverGrid = _canvas.HoverGridPoint;
         _minimap.Invalidate();
+    }
+
+    private void RefreshDeviceHubUi()
+    {
+        var profile = _canvas.Project.DeviceHub ?? new DeviceHubProfile();
+        profile.EnsureDefaults();
+        _canvas.Project.DeviceHub = profile;
+
+        _suppressUiEvents = true;
+        try
+        {
+            _deviceHubGitHubText.Text = profile.GitHubRepositoryUrl;
+            _deviceHubSourceForgeText.Text = profile.SourceForgeUrl;
+            _deviceHubDocsText.Text = profile.FalloutDocsTarget;
+            _deviceHubMobileLinkText.Text = profile.MobileCompanionUrl;
+            _deviceHubMobileFolderText.Text = profile.MobileExportFolder;
+            _deviceHubXboxTargetText.Text = profile.Xbox.Target;
+            _deviceHubPlayStationTargetText.Text = profile.PlayStation.Target;
+            _deviceHubGenericConsoleTargetText.Text = profile.GenericConsole.Target;
+            _deviceHubConsoleNotesText.Text = profile.ConsoleInstructions;
+        }
+        finally
+        {
+            _suppressUiEvents = false;
+        }
+
+        var workspaceRoot = GetWorkspaceRootPath();
+        var releaseFolder = GetReleaseFolderPath();
+        var launchExePath = Path.Combine(releaseFolder, "FO76CampPlanner.exe");
+        var docsTarget = ResolveTargetPath(profile.FalloutDocsTarget);
+
+        SetHubButtonState(_hubOpenProjectFolderButton, Directory.Exists(workspaceRoot), "Open current project folder.", $"Folder missing: {workspaceRoot}");
+        SetHubButtonState(_hubOpenReleaseFolderButton, Directory.Exists(releaseFolder), "Open release publish folder.", $"Release folder not found: {releaseFolder}");
+        SetHubButtonState(_hubLaunchExeButton, File.Exists(launchExePath), "Launch published FO76CampPlanner.exe.", $"Executable not found: {launchExePath}");
+        SetHubButtonState(_hubOpenGitHubButton, IsLikelyWebUrl(profile.GitHubRepositoryUrl), "Open configured GitHub repository.", "GitHub URL is not configured.");
+        SetHubButtonState(_hubOpenSourceForgeButton, IsLikelyWebUrl(profile.SourceForgeUrl), "Open configured SourceForge page.", "SourceForge URL is not configured.");
+        SetHubButtonState(_hubOpenDocsButton, IsOpenableTarget(profile.FalloutDocsTarget, docsTarget), "Open configured Fallout docs/resource target.", "Docs/resource target is not configured or not found.");
+        SetHubButtonState(_hubOpenMobileExportFolderButton, true, "Open mobile companion export folder.", string.Empty);
+        SetHubButtonState(_hubExportMobileSummaryButton, true, "Export compact project summary for mobile sharing.", string.Empty);
+        SetHubButtonState(_hubGenerateSnapshotPackButton, true, "Generate PNG + summary snapshot pack.", string.Empty);
+        SetHubButtonState(_hubOpenCompactViewButton, true, "Switch planner to compact presentation-oriented review state.", string.Empty);
+        SetHubButtonState(_hubGenerateQrLinksButton, true, "Generate a QR-ready link list file for companion workflows.", string.Empty);
+
+        SetHubButtonState(_hubOpenXboxButton, IsOpenableTarget(profile.Xbox.Target, ResolveTargetPath(profile.Xbox.Target)), "Open configured Xbox target.", "Xbox target not configured.");
+        SetHubButtonState(_hubOpenPlayStationButton, IsOpenableTarget(profile.PlayStation.Target, ResolveTargetPath(profile.PlayStation.Target)), "Open configured PlayStation target.", "PlayStation target not configured.");
+        SetHubButtonState(_hubOpenGenericConsoleButton, IsOpenableTarget(profile.GenericConsole.Target, ResolveTargetPath(profile.GenericConsole.Target)), "Open configured generic console target.", "Generic console target not configured.");
+
+        _deviceHubStatusLabel.Text =
+            $"Workspace: {Path.GetFileName(workspaceRoot)}\n" +
+            $"Release folder: {(Directory.Exists(releaseFolder) ? "Ready" : "Missing")}\n" +
+            $"Console notes: {(string.IsNullOrWhiteSpace(profile.ConsoleInstructions) ? "Not configured" : "Configured")}";
+
+        _deviceHubConfigLabel.Text =
+            "Device Hub launch profiles are stored in the project JSON.\n" +
+            "Targets may be URLs, local file paths, or docs placeholders for future integration.";
+    }
+
+    private void SetHubButtonState(Button? button, bool enabled, string enabledTip, string disabledTip)
+    {
+        if (button is null)
+        {
+            return;
+        }
+
+        button.Enabled = enabled;
+        _deviceHubToolTip.SetToolTip(button, enabled ? enabledTip : disabledTip);
+    }
+
+    private void ApplyDeviceHubConfig()
+    {
+        if (_suppressUiEvents)
+        {
+            return;
+        }
+
+        var profile = _canvas.Project.DeviceHub ?? new DeviceHubProfile();
+        profile.GitHubRepositoryUrl = _deviceHubGitHubText.Text;
+        profile.SourceForgeUrl = _deviceHubSourceForgeText.Text;
+        profile.FalloutDocsTarget = _deviceHubDocsText.Text;
+        profile.MobileCompanionUrl = _deviceHubMobileLinkText.Text;
+        profile.MobileExportFolder = _deviceHubMobileFolderText.Text;
+        profile.Xbox.Target = _deviceHubXboxTargetText.Text;
+        profile.PlayStation.Target = _deviceHubPlayStationTargetText.Text;
+        profile.GenericConsole.Target = _deviceHubGenericConsoleTargetText.Text;
+        profile.ConsoleInstructions = _deviceHubConsoleNotesText.Text;
+        profile.EnsureDefaults();
+
+        _canvas.Project.DeviceHub = profile;
+        MarkDirty();
+        RefreshProjectUi();
+        _statusLabel.Text = "Device Hub launch configuration saved to project.";
+    }
+
+    private void OpenDeviceHubProjectFolder()
+        => OpenDirectorySafe(GetWorkspaceRootPath(), "Project folder opened.");
+
+    private void OpenDeviceHubReleaseFolder()
+        => OpenDirectorySafe(GetReleaseFolderPath(), "Release folder opened.");
+
+    private void LaunchDeviceHubExecutable()
+    {
+        var launchPath = Path.Combine(GetReleaseFolderPath(), "FO76CampPlanner.exe");
+        OpenTargetSafe(launchPath, "Launched FO76CampPlanner.exe.");
+    }
+
+    private void OpenDeviceHubGitHub()
+        => OpenTargetSafe(_canvas.Project.DeviceHub.GitHubRepositoryUrl, "Opened GitHub repository.");
+
+    private void OpenDeviceHubSourceForge()
+        => OpenTargetSafe(_canvas.Project.DeviceHub.SourceForgeUrl, "Opened SourceForge page.");
+
+    private void OpenDeviceHubDocs()
+        => OpenTargetSafe(_canvas.Project.DeviceHub.FalloutDocsTarget, "Opened Fallout docs/resource target.");
+
+    private void OpenDeviceHubMobileCompanionLink()
+        => OpenTargetSafe(_canvas.Project.DeviceHub.MobileCompanionUrl, "Opened mobile companion link.");
+
+    private void OpenDeviceHubConsoleTarget(string platform)
+    {
+        var profile = _canvas.Project.DeviceHub;
+        var target = platform switch
+        {
+            "Xbox" => profile.Xbox.Target,
+            "PlayStation" => profile.PlayStation.Target,
+            _ => profile.GenericConsole.Target
+        };
+
+        OpenTargetSafe(target, $"Opened {platform} target.");
+    }
+
+    private void OpenDeviceHubMobileExportFolder()
+    {
+        var folder = EnsureMobileExportFolderExists();
+        OpenDirectorySafe(folder, "Mobile export folder opened.");
+    }
+
+    private void ExportMobileProjectSummary()
+    {
+        var folder = EnsureMobileExportFolderExists();
+        var project = _canvas.Project;
+        var summaryPath = Path.Combine(folder, $"{SafeFileName(project.Name)}-mobile-summary.txt");
+        var lines = BuildMobileSummaryLines();
+        File.WriteAllLines(summaryPath, lines);
+        _statusLabel.Text = $"Mobile summary exported: {Path.GetFileName(summaryPath)}.";
+    }
+
+    private void ExportMobileSnapshotPack()
+    {
+        var folder = EnsureMobileExportFolderExists();
+        var project = _canvas.Project;
+        var snapshotBase = SafeFileName(project.Name);
+        var imagePath = Path.Combine(folder, $"{snapshotBase}-snapshot.png");
+        using (var bitmap = _canvas.RenderToBitmap())
+        {
+            bitmap.Save(imagePath);
+        }
+
+        var summaryPath = Path.Combine(folder, $"{snapshotBase}-snapshot-summary.txt");
+        File.WriteAllLines(summaryPath, BuildMobileSummaryLines());
+        _statusLabel.Text = $"Snapshot pack created: {Path.GetFileName(imagePath)} + {Path.GetFileName(summaryPath)}.";
+    }
+
+    private void GenerateMobileQrLinks()
+    {
+        var folder = EnsureMobileExportFolderExists();
+        var project = _canvas.Project;
+        var profile = project.DeviceHub;
+        var lines = new List<string>
+        {
+            "FO76 CAMP Planner - Device Hub QR-ready Links",
+            $"Generated (UTC): {DateTime.UtcNow:yyyy-MM-dd HH:mm:ss}",
+            string.Empty,
+            "Paste links into your preferred QR generator or mobile companion app:",
+            $"GitHub: {profile.GitHubRepositoryUrl}",
+            $"SourceForge: {(string.IsNullOrWhiteSpace(profile.SourceForgeUrl) ? "(not configured)" : profile.SourceForgeUrl)}",
+            $"Mobile Companion: {(string.IsNullOrWhiteSpace(profile.MobileCompanionUrl) ? "(not configured)" : profile.MobileCompanionUrl)}",
+            $"Docs Target: {(string.IsNullOrWhiteSpace(profile.FalloutDocsTarget) ? "(not configured)" : profile.FalloutDocsTarget)}",
+            string.Empty,
+            "Console Targets",
+            $"Xbox: {(string.IsNullOrWhiteSpace(profile.Xbox.Target) ? "(not configured)" : profile.Xbox.Target)}",
+            $"PlayStation: {(string.IsNullOrWhiteSpace(profile.PlayStation.Target) ? "(not configured)" : profile.PlayStation.Target)}",
+            $"Generic: {(string.IsNullOrWhiteSpace(profile.GenericConsole.Target) ? "(not configured)" : profile.GenericConsole.Target)}"
+        };
+
+        var qrPath = Path.Combine(folder, $"{SafeFileName(project.Name)}-qr-links.txt");
+        File.WriteAllLines(qrPath, lines);
+        _statusLabel.Text = $"QR-ready links exported: {Path.GetFileName(qrPath)}.";
+    }
+
+    private void OpenCompactPresentationView()
+    {
+        ApplyOverlayPreset(OverlayReviewPreset.Presentation);
+        ApplyFocusPreset("Presentation");
+        _statusLabel.Text = "Compact presentation view applied.";
+    }
+
+    private IEnumerable<string> BuildMobileSummaryLines()
+    {
+        var project = _canvas.Project;
+        var preset = PresetLibrary.GetById(project.PresetId).Name;
+        var turretCount = project.Items.Count(item => Catalog.ById.TryGetValue(item.DefinitionId, out var def) && def.Id == "turret");
+        var markerCount = project.VisitorMarkers.Count;
+        var trapCount = project.TrapZones.Count;
+        var placedBudget = project.Items.Sum(item => Catalog.ById.TryGetValue(item.DefinitionId, out var def) ? def.BudgetCost : 0);
+        var totalBudget = placedBudget + project.StoredBudget;
+
+        return new[]
+        {
+            "FO76 CAMP Planner - Mobile Project Summary",
+            $"Generated (UTC): {DateTime.UtcNow:yyyy-MM-dd HH:mm:ss}",
+            string.Empty,
+            $"Project: {project.Name}",
+            $"Preset: {preset}",
+            $"Mode: {project.Mode}",
+            $"Rule Profile: {project.RuleProfile}",
+            $"Snap: {project.SnapMode}",
+            $"Grid: {project.GridWidth}x{project.GridHeight}",
+            string.Empty,
+            $"Placed items: {project.Items.Count}",
+            $"Turrets: {turretCount}",
+            $"Visitor markers: {markerCount}",
+            $"Trap zones: {trapCount}",
+            $"Budget: {totalBudget}/{project.BudgetLimit} (placed {placedBudget}, stored {project.StoredBudget})",
+            string.Empty,
+            $"Notes: {(string.IsNullOrWhiteSpace(project.DefenseReviewNotes) ? "(none)" : project.DefenseReviewNotes)}"
+        };
+    }
+
+    private string EnsureMobileExportFolderExists()
+    {
+        var profile = _canvas.Project.DeviceHub;
+        var configured = string.IsNullOrWhiteSpace(profile.MobileExportFolder) ? "exports/mobile" : profile.MobileExportFolder.Trim();
+        var folder = Path.IsPathRooted(configured)
+            ? configured
+            : Path.Combine(GetWorkspaceRootPath(), configured);
+
+        Directory.CreateDirectory(folder);
+        return folder;
+    }
+
+    private string GetWorkspaceRootPath()
+    {
+        var current = new DirectoryInfo(AppContext.BaseDirectory);
+        while (current is not null)
+        {
+            var csproj = Path.Combine(current.FullName, "FO76CampPlanner.csproj");
+            if (File.Exists(csproj))
+            {
+                return current.FullName;
+            }
+
+            current = current.Parent;
+        }
+
+        return Environment.CurrentDirectory;
+    }
+
+    private string GetReleaseFolderPath()
+        => Path.Combine(GetWorkspaceRootPath(), "bin", "Release", "net8.0-windows", "win-x64", "publish");
+
+    private static bool IsLikelyWebUrl(string? value)
+        => Uri.TryCreate(value, UriKind.Absolute, out var uri)
+           && (uri.Scheme == Uri.UriSchemeHttp || uri.Scheme == Uri.UriSchemeHttps);
+
+    private string ResolveTargetPath(string? target)
+    {
+        if (string.IsNullOrWhiteSpace(target))
+        {
+            return string.Empty;
+        }
+
+        var trimmed = target.Trim();
+        if (Path.IsPathRooted(trimmed))
+        {
+            return trimmed;
+        }
+
+        return Path.Combine(GetWorkspaceRootPath(), trimmed);
+    }
+
+    private bool IsOpenableTarget(string? target, string resolvedPath)
+    {
+        if (string.IsNullOrWhiteSpace(target))
+        {
+            return false;
+        }
+
+        if (IsLikelyWebUrl(target))
+        {
+            return true;
+        }
+
+        return File.Exists(resolvedPath) || Directory.Exists(resolvedPath);
+    }
+
+    private void OpenDirectorySafe(string path, string successMessage)
+    {
+        if (!Directory.Exists(path))
+        {
+            MessageBox.Show(this, $"Directory not found:\n{path}", "Device Hub", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            _statusLabel.Text = "Device Hub action failed: missing directory.";
+            return;
+        }
+
+        Process.Start(new ProcessStartInfo
+        {
+            FileName = path,
+            UseShellExecute = true
+        });
+        _statusLabel.Text = successMessage;
+    }
+
+    private void OpenTargetSafe(string? target, string successMessage)
+    {
+        if (string.IsNullOrWhiteSpace(target))
+        {
+            MessageBox.Show(this, "Launch target is not configured.", "Device Hub", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            _statusLabel.Text = "Device Hub action skipped: target not configured.";
+            return;
+        }
+
+        try
+        {
+            if (IsLikelyWebUrl(target))
+            {
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = target.Trim(),
+                    UseShellExecute = true
+                });
+                _statusLabel.Text = successMessage;
+                return;
+            }
+
+            var resolved = ResolveTargetPath(target);
+            if (!File.Exists(resolved) && !Directory.Exists(resolved))
+            {
+                MessageBox.Show(this, $"Launch target not found:\n{resolved}", "Device Hub", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                _statusLabel.Text = "Device Hub action failed: target missing.";
+                return;
+            }
+
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = resolved,
+                UseShellExecute = true
+            });
+            _statusLabel.Text = successMessage;
+        }
+        catch (Exception ex)
+        {
+            MessageBox.Show(this, ex.Message, "Device Hub launch failed", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            _statusLabel.Text = "Device Hub action failed.";
+        }
     }
 
     private void RefreshSelectionUi()
@@ -2014,21 +2711,381 @@ public sealed class MainForm : Form
 
     private void RefreshAnalysisUi()
     {
+        var project = _canvas.Project;
         var centerX = _canvas.Project.CampCenterX >= 0 ? _canvas.Project.CampCenterX : _canvas.Project.GridWidth / 2;
         var centerY = _canvas.Project.CampCenterY >= 0 ? _canvas.Project.CampCenterY : _canvas.Project.GridHeight / 2;
-        var lockedCount = Enum.GetValues<LayerType>().Count(layer => _canvas.Project.LayerLocks.IsLocked(layer));
-        var visibleCount = Enum.GetValues<LayerType>().Count(layer => _canvas.Project.LayerVisibility.IsVisible(layer));
+        var lockedCount = Enum.GetValues<LayerType>().Count(layer => project.LayerLocks.IsLocked(layer));
+        var visibleCount = Enum.GetValues<LayerType>().Count(layer => project.LayerVisibility.IsVisible(layer));
+        var turretCount = project.Items.Count(item => Catalog.ById.TryGetValue(item.DefinitionId, out var def) && def.Id == "turret");
+        var defenseItemCount = project.Items.Count(item => Catalog.ById.TryGetValue(item.DefinitionId, out var def) && def.Layer == LayerType.Defense);
+        var ingressMarkers = project.VisitorMarkers.Where(marker => marker.Type == VisitorMarkerType.Ingress).ToList();
+        var egressCount = project.VisitorMarkers.Count(marker => marker.Type == VisitorMarkerType.Egress);
+        var checkpointCount = project.VisitorMarkers.Count(marker => marker.Type == VisitorMarkerType.Checkpoint);
+        var defendedIngressCount = ingressMarkers.Count(marker => IsMarkerCoveredByAnyTurret(marker, project.Items));
+        var highSeverityZones = project.TrapZones.Count(zone => zone.Severity is TrapZoneSeverity.High or TrapZoneSeverity.Critical);
+        var criticalZones = project.TrapZones.Count(zone => zone.Severity == TrapZoneSeverity.Critical);
+        var profileSpec = BudgetProfileLibrary.Profiles.TryGetValue(project.BudgetProfile, out var spec) ? spec : null;
+        var shelterRuleSpec = ShelterRuleLibrary.TryGetForPreset(project.PresetId, out var shelterSpec) ? shelterSpec : null;
+        var flowComplete = ingressMarkers.Count > 0 && egressCount > 0;
+        var defenseScore = CalculateDefenseScore(
+            project,
+            profileSpec,
+            turretCount,
+            defenseItemCount,
+            ingressMarkers.Count,
+            checkpointCount,
+            egressCount,
+            defendedIngressCount,
+            highSeverityZones,
+            criticalZones);
+        var riskHints = GetDefenseRiskHints(
+            project,
+            profileSpec,
+            shelterRuleSpec,
+            turretCount,
+            defenseItemCount,
+            ingressMarkers.Count,
+            checkpointCount,
+            egressCount,
+            defendedIngressCount,
+            highSeverityZones,
+            criticalZones);
+        var riskSummary = riskHints.Count == 0
+            ? "No immediate risk flags."
+            : string.Join(" | ", riskHints.Take(3));
+        var currentScenario = new ScenarioSnapshot(
+            project.Items.Count,
+            project.Items.Sum(item => Catalog.ById.TryGetValue(item.DefinitionId, out var def) ? def.BudgetCost : 0),
+            turretCount,
+            defenseItemCount,
+            project.VisitorMarkers.Count,
+            project.TrapZones.Count,
+            ingressMarkers.Count,
+            defendedIngressCount,
+            defenseScore);
+        var compareLine = BuildScenarioCompareLine(currentScenario);
+
         _analysisLabel.Text =
+            $"Defense score (approx): {defenseScore}/100\n" +
+            $"Turrets: {turretCount} • Defense items: {defenseItemCount}\n" +
+            $"Ingress coverage: {defendedIngressCount}/{ingressMarkers.Count}\n" +
+            $"Flow chain: {(flowComplete ? "Ingress → Egress defined" : "Incomplete")}, checkpoints: {checkpointCount}\n" +
+            $"Budget profile: {project.BudgetProfile}{(profileSpec is null ? string.Empty : $" (target T{profileSpec.RecommendedTurrets}/D{profileSpec.RecommendedDefenseItems}/I{profileSpec.RecommendedIngressMarkers}/Z{profileSpec.RecommendedTrapZones})")}\n" +
+            $"Shelter profile: {(shelterRuleSpec is null ? "None" : $"T{shelterRuleSpec.MaxTurrets}/M{shelterRuleSpec.MaxVisitorMarkers}/Z{shelterRuleSpec.MaxTrapZones}/S<= {shelterRuleSpec.MaxTrapSeverity}")}\n" +
+            $"High/Critical zones: {highSeverityZones}/{criticalZones}\n" +
             $"Approx center: ({centerX}, {centerY})\n" +
-            $"Surface radius: {(_canvas.Project.ShowCampRadiusOverlay ? "On" : "Off")}\n" +
-            $"Turret arcs: {(_canvas.Project.ShowTurretCoverage ? "On" : "Off")}\n" +
-            $"Visitor flow: {(_canvas.Project.ShowVisitorFlowOverlay ? "On" : "Off")}\n" +
-            $"Trap zones: {(_canvas.Project.ShowTrapZonesOverlay ? "On" : "Off")}\n" +
-            $"Overlay preset: {_canvas.Project.OverlayPreset}\n" +
-            $"Visitor markers: {_canvas.Project.VisitorMarkers.Count}\n" +
-                $"Structured trap zones: {_canvas.Project.TrapZones.Count}\n" +
+            $"Surface radius: {(project.ShowCampRadiusOverlay ? "On" : "Off")}\n" +
+            $"Turret arcs: {(project.ShowTurretCoverage ? "On" : "Off")}\n" +
+            $"Visitor flow: {(project.ShowVisitorFlowOverlay ? "On" : "Off")}\n" +
+            $"Trap zones: {(project.ShowTrapZonesOverlay ? "On" : "Off")}\n" +
+            $"Overlay preset: {project.OverlayPreset}\n" +
+            $"Visitor markers: {project.VisitorMarkers.Count}\n" +
+            $"Structured trap zones: {project.TrapZones.Count}\n" +
             $"Visible layers: {visibleCount}/6\n" +
-            $"Locked layers: {lockedCount}";
+            $"Locked layers: {lockedCount}\n" +
+            $"Risk hints: {riskSummary}\n" +
+            $"Scenario compare: {compareLine}";
+    }
+
+    private string BuildScenarioCompareLine(ScenarioSnapshot current)
+    {
+        if (_scenarioBaseline is null)
+        {
+            return "No baseline captured.";
+        }
+
+        var baseline = _scenarioBaseline;
+        var budgetDelta = current.PlacedBudget - baseline.PlacedBudget;
+        var defenseDelta = current.DefenseScore - baseline.DefenseScore;
+        var ingressCoverageDelta = current.DefendedIngressCount - baseline.DefendedIngressCount;
+
+        return
+            $"Score {(defenseDelta >= 0 ? "+" : string.Empty)}{defenseDelta}, " +
+            $"Budget {(budgetDelta >= 0 ? "+" : string.Empty)}{budgetDelta}, " +
+            $"Covered ingress {(ingressCoverageDelta >= 0 ? "+" : string.Empty)}{ingressCoverageDelta}";
+    }
+
+    private void CaptureScenarioBaseline()
+    {
+        var project = _canvas.Project;
+        var turretCount = project.Items.Count(item => Catalog.ById.TryGetValue(item.DefinitionId, out var def) && def.Id == "turret");
+        var defenseItemCount = project.Items.Count(item => Catalog.ById.TryGetValue(item.DefinitionId, out var def) && def.Layer == LayerType.Defense);
+        var ingressMarkers = project.VisitorMarkers.Where(marker => marker.Type == VisitorMarkerType.Ingress).ToList();
+        var egressCount = project.VisitorMarkers.Count(marker => marker.Type == VisitorMarkerType.Egress);
+        var checkpointCount = project.VisitorMarkers.Count(marker => marker.Type == VisitorMarkerType.Checkpoint);
+        var defendedIngressCount = ingressMarkers.Count(marker => IsMarkerCoveredByAnyTurret(marker, project.Items));
+        var highSeverityZones = project.TrapZones.Count(zone => zone.Severity is TrapZoneSeverity.High or TrapZoneSeverity.Critical);
+        var criticalZones = project.TrapZones.Count(zone => zone.Severity == TrapZoneSeverity.Critical);
+        var profileSpec = BudgetProfileLibrary.Profiles.TryGetValue(project.BudgetProfile, out var spec) ? spec : null;
+
+        _scenarioBaseline = new ScenarioSnapshot(
+            project.Items.Count,
+            project.Items.Sum(item => Catalog.ById.TryGetValue(item.DefinitionId, out var def) ? def.BudgetCost : 0),
+            turretCount,
+            defenseItemCount,
+            project.VisitorMarkers.Count,
+            project.TrapZones.Count,
+            ingressMarkers.Count,
+            defendedIngressCount,
+            CalculateDefenseScore(project, profileSpec, turretCount, defenseItemCount, ingressMarkers.Count, checkpointCount, egressCount, defendedIngressCount, highSeverityZones, criticalZones));
+
+        RefreshAnalysisUi();
+        _statusLabel.Text = "Scenario baseline captured for compare.";
+    }
+
+    private void ClearScenarioBaseline()
+    {
+        _scenarioBaseline = null;
+        RefreshAnalysisUi();
+        _statusLabel.Text = "Scenario baseline cleared.";
+    }
+
+    private static int CalculateDefenseScore(
+        PlannerProject project,
+        BudgetProfileLibrary.BudgetProfileSpec? profileSpec,
+        int turretCount,
+        int defenseItemCount,
+        int ingressCount,
+        int checkpointCount,
+        int egressCount,
+        int defendedIngressCount,
+        int highSeverityZones,
+        int criticalZones)
+    {
+        var score = 80;
+
+        if (turretCount == 0)
+        {
+            score -= 30;
+        }
+
+        if (defenseItemCount < 3)
+        {
+            score -= 15;
+        }
+
+        if (ingressCount > 0)
+        {
+            var uncovered = Math.Max(0, ingressCount - defendedIngressCount);
+            score -= (int)Math.Round(30.0 * uncovered / ingressCount);
+        }
+        else
+        {
+            score -= 10;
+        }
+
+        if (egressCount == 0)
+        {
+            score -= 8;
+        }
+
+        if (checkpointCount == 0)
+        {
+            score -= 4;
+        }
+
+        score -= criticalZones * 6;
+        score -= Math.Max(0, highSeverityZones - criticalZones) * 3;
+
+        if (turretCount >= 4)
+        {
+            score += 8;
+        }
+
+        if (defenseItemCount >= 8)
+        {
+            score += 6;
+        }
+
+        if (project.Mode == BuildMode.Shelter)
+        {
+            score += 4;
+            if (project.ShowCampRadiusOverlay)
+            {
+                score -= 2;
+            }
+        }
+
+        if (profileSpec is not null)
+        {
+            if (turretCount >= profileSpec.RecommendedTurrets)
+            {
+                score += 4;
+            }
+            else
+            {
+                score -= 4;
+            }
+
+            if (defenseItemCount >= profileSpec.RecommendedDefenseItems)
+            {
+                score += 4;
+            }
+
+            if (ingressCount >= profileSpec.RecommendedIngressMarkers)
+            {
+                score += 3;
+            }
+
+            if (project.TrapZones.Count >= profileSpec.RecommendedTrapZones)
+            {
+                score += 2;
+            }
+        }
+
+        return Math.Clamp(score, 0, 100);
+    }
+
+    private static List<string> GetDefenseRiskHints(
+        PlannerProject project,
+        BudgetProfileLibrary.BudgetProfileSpec? profileSpec,
+        ShelterRuleLibrary.ShelterRuleSpec? shelterRuleSpec,
+        int turretCount,
+        int defenseItemCount,
+        int ingressCount,
+        int checkpointCount,
+        int egressCount,
+        int defendedIngressCount,
+        int highSeverityZones,
+        int criticalZones)
+    {
+        var hints = new List<string>();
+
+        if (turretCount == 0)
+        {
+            hints.Add("No turret coverage configured.");
+        }
+
+        if (defenseItemCount < 3)
+        {
+            hints.Add("Low defense item density.");
+        }
+
+        if (ingressCount > 0 && defendedIngressCount < ingressCount)
+        {
+            hints.Add("Some ingress routes are not turret-covered.");
+        }
+
+        if (egressCount == 0)
+        {
+            hints.Add("Add at least one egress marker to complete visitor flow.");
+        }
+
+        if (checkpointCount == 0)
+        {
+            hints.Add("Add a checkpoint marker for route readability.");
+        }
+
+        if (criticalZones > 0)
+        {
+            hints.Add("Critical trap zones need review notes and fallback routes.");
+        }
+
+        if (highSeverityZones > 0 && !project.ShowTrapZonesOverlay)
+        {
+            hints.Add("Trap overlay is off while high-severity zones exist.");
+        }
+
+        if (project.VisitorMarkers.Count == 0)
+        {
+            hints.Add("No route markers defined for defense flow review.");
+        }
+
+        if (project.Mode == BuildMode.Shelter && project.ShowCampRadiusOverlay)
+        {
+            hints.Add("CAMP radius overlay is less relevant in Shelter mode.");
+        }
+
+        if (shelterRuleSpec is not null)
+        {
+            if (turretCount > shelterRuleSpec.MaxTurrets)
+            {
+                hints.Add($"Shelter turret cap exceeded ({turretCount}/{shelterRuleSpec.MaxTurrets}).");
+            }
+
+            if (project.VisitorMarkers.Count > shelterRuleSpec.MaxVisitorMarkers)
+            {
+                hints.Add($"Shelter route marker cap exceeded ({project.VisitorMarkers.Count}/{shelterRuleSpec.MaxVisitorMarkers}).");
+            }
+
+            if (project.TrapZones.Count > shelterRuleSpec.MaxTrapZones)
+            {
+                hints.Add($"Shelter trap zone cap exceeded ({project.TrapZones.Count}/{shelterRuleSpec.MaxTrapZones}).");
+            }
+
+            if (project.TrapZones.Any(zone => zone.Severity > shelterRuleSpec.MaxTrapSeverity))
+            {
+                hints.Add($"One or more trap zones exceed shelter severity cap ({shelterRuleSpec.MaxTrapSeverity}).");
+            }
+        }
+
+        if (project.Mode == BuildMode.SurfaceCamp && project.RuleProfile == RuleProfile.Shelter)
+        {
+            hints.Add("Shelter rule profile is not recommended for Surface CAMP.");
+        }
+
+        if (profileSpec is not null)
+        {
+            if (turretCount < profileSpec.RecommendedTurrets)
+            {
+                hints.Add($"{project.BudgetProfile} profile suggests at least {profileSpec.RecommendedTurrets} turrets.");
+            }
+
+            if (defenseItemCount < profileSpec.RecommendedDefenseItems)
+            {
+                hints.Add($"{project.BudgetProfile} profile suggests at least {profileSpec.RecommendedDefenseItems} defense items.");
+            }
+        }
+
+        return hints;
+    }
+
+    private static bool IsMarkerCoveredByAnyTurret(VisitorMarker marker, IEnumerable<PlacedItem> items)
+        => items.Any(item => IsTurret(item) && IsMarkerCoveredByTurret(marker, item));
+
+    private static bool IsTurret(PlacedItem item)
+        => Catalog.ById.TryGetValue(item.DefinitionId, out var definition) && definition.Id == "turret";
+
+    private static bool IsMarkerCoveredByTurret(VisitorMarker marker, PlacedItem turret)
+    {
+        const double rangeCells = 6.5;
+        const double halfSweep = 60d;
+
+        var dx = (marker.X + 0.5) - (turret.X + 0.5);
+        var dy = (marker.Y + 0.5) - (turret.Y + 0.5);
+        var distance = Math.Sqrt((dx * dx) + (dy * dy));
+        if (distance > rangeCells)
+        {
+            return false;
+        }
+
+        var markerAngle = Math.Atan2(dy, dx) * 180d / Math.PI;
+        var turretAngle = turret.Rotation switch
+        {
+            0 => -90d,
+            90 => 0d,
+            180 => 90d,
+            270 => 180d,
+            _ => -90d
+        };
+
+        var delta = NormalizeAngle(markerAngle - turretAngle);
+        return Math.Abs(delta) <= halfSweep;
+    }
+
+    private static double NormalizeAngle(double angle)
+    {
+        while (angle > 180d)
+        {
+            angle -= 360d;
+        }
+
+        while (angle < -180d)
+        {
+            angle += 360d;
+        }
+
+        return angle;
     }
 
     private void RefreshBlueprintUi()
@@ -2068,6 +3125,7 @@ public sealed class MainForm : Form
             .OrderByDescending(zone => zone.Severity)
             .ThenBy(zone => zone.Label)
             .ToList();
+        var shelterRuleSpec = ShelterRuleLibrary.TryGetForPreset(_canvas.Project.PresetId, out var shelterSpec) ? shelterSpec : null;
 
         _visitorMarkerList.BeginUpdate();
         _visitorMarkerList.Items.Clear();
@@ -2119,10 +3177,266 @@ public sealed class MainForm : Form
         _routePlanningLabel.Text =
             $"Overlay preset: {_canvas.Project.OverlayPreset}\n" +
             $"Ordered route steps: {orderedMarkers.Count}\n" +
+            $"Ingress/Checkpoint/Egress: {orderedMarkers.Count(x => x.Type == VisitorMarkerType.Ingress)}/{orderedMarkers.Count(x => x.Type == VisitorMarkerType.Checkpoint)}/{orderedMarkers.Count(x => x.Type == VisitorMarkerType.Egress)}\n" +
             $"Trap zones: {trapZones.Count}\n" +
+            $"Shelter caps: {(shelterRuleSpec is null ? "N/A" : $"Markers {orderedMarkers.Count}/{shelterRuleSpec.MaxVisitorMarkers}, Zones {trapZones.Count}/{shelterRuleSpec.MaxTrapZones}, Max severity {shelterRuleSpec.MaxTrapSeverity}")}\n" +
+            $"Flow markers in high/critical zones: {CountMarkersInsideTrapSeverity(orderedMarkers, trapZones, TrapZoneSeverity.High, TrapZoneSeverity.Critical)}\n" +
             $"Review notes: {(string.IsNullOrWhiteSpace(_canvas.Project.DefenseReviewNotes) ? "Not saved" : "Saved")}\n" +
             "Add markers from hover/selection, reorder them here, and keep zone severity plus review notes in the project file.";
+
+        _shelterRuleLabel.Text = BuildShelterRouteAdvice(shelterRuleSpec, orderedMarkers, trapZones);
+        UpdateRoutePlanningActionState(shelterRuleSpec, orderedMarkers.Count, trapZones.Count);
+        RefreshCapMeter(shelterRuleSpec, orderedMarkers.Count, trapZones.Count);
     }
+
+    private static readonly Color CapColorWarn = Color.FromArgb(246, 196, 80);
+    private static readonly Color CapColorErr  = Color.FromArgb(235, 87,  87);
+
+    private void RefreshCapMeter(
+        ShelterRuleLibrary.ShelterRuleSpec? shelterRuleSpec,
+        int markerCount,
+        int trapZoneCount)
+    {
+        if (shelterRuleSpec is null)
+        {
+            _capMeterLabel.Text = "No shelter rule for this preset.";
+            _capMeterLabel.ForeColor = TextSecondary;
+            return;
+        }
+
+        var markerPct  = shelterRuleSpec.MaxVisitorMarkers > 0 ? (double)markerCount  / shelterRuleSpec.MaxVisitorMarkers  : 0.0;
+        var zonePct    = shelterRuleSpec.MaxTrapZones      > 0 ? (double)trapZoneCount / shelterRuleSpec.MaxTrapZones       : 0.0;
+
+        var atCap  = markerCount  >= shelterRuleSpec.MaxVisitorMarkers
+                  || trapZoneCount >= shelterRuleSpec.MaxTrapZones;
+        var nearCap = !atCap && (markerPct >= 0.75 || zonePct >= 0.75);
+
+        var markerBar = BuildMiniBar(markerCount,  shelterRuleSpec.MaxVisitorMarkers);
+        var zoneBar   = BuildMiniBar(trapZoneCount, shelterRuleSpec.MaxTrapZones);
+
+        _capMeterLabel.Text =
+            $"Markers  {markerCount}/{shelterRuleSpec.MaxVisitorMarkers}  {markerBar}\n" +
+            $"Zones    {trapZoneCount}/{shelterRuleSpec.MaxTrapZones}  {zoneBar}\n" +
+            $"Max sev  {shelterRuleSpec.MaxTrapSeverity}";
+
+        _capMeterLabel.ForeColor = atCap   ? CapColorErr
+                                 : nearCap ? CapColorWarn
+                                           : StatusOk;
+    }
+
+    private static string BuildMiniBar(int value, int max)
+    {
+        if (max <= 0) return string.Empty;
+        const int barWidth = 8;
+        var filled = (int)Math.Round((double)value / max * barWidth);
+        filled = Math.Clamp(filled, 0, barWidth);
+        return "[" + new string('█', filled) + new string('░', barWidth - filled) + "]";
+    }
+
+    private void UpdateRoutePlanningActionState(
+        ShelterRuleLibrary.ShelterRuleSpec? shelterRuleSpec,
+        int markerCount,
+        int trapZoneCount)
+    {
+        if (shelterRuleSpec is null)
+        {
+            SetRouteActionButtonsEnabled(markersEnabled: true, funnelEnabled: true, delayEnabled: true, killBoxEnabled: true, duplicateZoneEnabled: true);
+            ApplyRouteActionTooltips(null, markerCount, trapZoneCount);
+            return;
+        }
+
+        var canAddMarker = markerCount < shelterRuleSpec.MaxVisitorMarkers;
+        var canAddTrapZone = trapZoneCount < shelterRuleSpec.MaxTrapZones;
+
+        var canFunnel = canAddTrapZone && TrapZoneSeverity.Medium <= shelterRuleSpec.MaxTrapSeverity;
+        var canDelay = canAddTrapZone && TrapZoneSeverity.High <= shelterRuleSpec.MaxTrapSeverity;
+        var canKillBox = canAddTrapZone && TrapZoneSeverity.Critical <= shelterRuleSpec.MaxTrapSeverity;
+
+        SetRouteActionButtonsEnabled(
+            markersEnabled: canAddMarker,
+            funnelEnabled: canFunnel,
+            delayEnabled: canDelay,
+            killBoxEnabled: canKillBox,
+            duplicateZoneEnabled: canAddTrapZone);
+
+        ApplyRouteActionTooltips(shelterRuleSpec, markerCount, trapZoneCount);
+    }
+
+    private void ApplyRouteActionTooltips(ShelterRuleLibrary.ShelterRuleSpec? shelterRuleSpec, int markerCount, int trapZoneCount)
+    {
+        if (shelterRuleSpec is null)
+        {
+            SetRouteActionTooltip(_addIngressButton, "Add ingress marker.");
+            SetRouteActionTooltip(_addCheckpointButton, "Add checkpoint marker.");
+            SetRouteActionTooltip(_addEgressButton, "Add egress marker.");
+            SetRouteActionTooltip(_zoneFunnelButton, "Create a medium-severity trap zone from selection.");
+            SetRouteActionTooltip(_zoneDelayButton, "Create a high-severity trap zone from selection.");
+            SetRouteActionTooltip(_zoneKillBoxButton, "Create a critical trap zone from selection.");
+            SetRouteActionTooltip(_dupZoneLeftButton, "Duplicate selected trap zone left.");
+            SetRouteActionTooltip(_dupZoneRightButton, "Duplicate selected trap zone right.");
+            SetRouteActionTooltip(_dupZoneUpButton, "Duplicate selected trap zone up.");
+            SetRouteActionTooltip(_dupZoneDownButton, "Duplicate selected trap zone down.");
+            return;
+        }
+
+        var presetName = PresetLibrary.GetById(_canvas.Project.PresetId).Name;
+        var markerReason = markerCount >= shelterRuleSpec.MaxVisitorMarkers
+            ? $"{presetName} marker cap reached ({markerCount}/{shelterRuleSpec.MaxVisitorMarkers})."
+            : $"Add marker ({markerCount}/{shelterRuleSpec.MaxVisitorMarkers} used).";
+
+        var zoneCapReached = trapZoneCount >= shelterRuleSpec.MaxTrapZones;
+        var zoneBaseReason = zoneCapReached
+            ? $"{presetName} trap-zone cap reached ({trapZoneCount}/{shelterRuleSpec.MaxTrapZones})."
+            : $"Add trap zone ({trapZoneCount}/{shelterRuleSpec.MaxTrapZones} used).";
+
+        var funnelReason = TrapZoneSeverity.Medium > shelterRuleSpec.MaxTrapSeverity
+            ? $"{presetName} allows severity up to {shelterRuleSpec.MaxTrapSeverity}."
+            : zoneBaseReason;
+        var delayReason = TrapZoneSeverity.High > shelterRuleSpec.MaxTrapSeverity
+            ? $"{presetName} allows severity up to {shelterRuleSpec.MaxTrapSeverity}."
+            : zoneBaseReason;
+        var killBoxReason = TrapZoneSeverity.Critical > shelterRuleSpec.MaxTrapSeverity
+            ? $"{presetName} allows severity up to {shelterRuleSpec.MaxTrapSeverity}."
+            : zoneBaseReason;
+
+        SetRouteActionTooltip(_addIngressButton, markerReason);
+        SetRouteActionTooltip(_addCheckpointButton, markerReason);
+        SetRouteActionTooltip(_addEgressButton, markerReason);
+        SetRouteActionTooltip(_zoneFunnelButton, funnelReason);
+        SetRouteActionTooltip(_zoneDelayButton, delayReason);
+        SetRouteActionTooltip(_zoneKillBoxButton, killBoxReason);
+
+        var duplicateReason = zoneCapReached
+            ? $"{presetName} trap-zone cap reached ({trapZoneCount}/{shelterRuleSpec.MaxTrapZones})."
+            : "Duplicate selected trap zone.";
+        SetRouteActionTooltip(_dupZoneLeftButton, duplicateReason);
+        SetRouteActionTooltip(_dupZoneRightButton, duplicateReason);
+        SetRouteActionTooltip(_dupZoneUpButton, duplicateReason);
+        SetRouteActionTooltip(_dupZoneDownButton, duplicateReason);
+    }
+
+    private void SetRouteActionTooltip(Button? button, string text)
+    {
+        if (button is null)
+        {
+            return;
+        }
+
+        _routeActionToolTip.SetToolTip(button, text);
+    }
+
+    private void SetRouteActionButtonsEnabled(
+        bool markersEnabled,
+        bool funnelEnabled,
+        bool delayEnabled,
+        bool killBoxEnabled,
+        bool duplicateZoneEnabled)
+    {
+        if (_addIngressButton is not null)
+        {
+            _addIngressButton.Enabled = markersEnabled;
+        }
+
+        if (_addCheckpointButton is not null)
+        {
+            _addCheckpointButton.Enabled = markersEnabled;
+        }
+
+        if (_addEgressButton is not null)
+        {
+            _addEgressButton.Enabled = markersEnabled;
+        }
+
+        if (_zoneFunnelButton is not null)
+        {
+            _zoneFunnelButton.Enabled = funnelEnabled;
+        }
+
+        if (_zoneDelayButton is not null)
+        {
+            _zoneDelayButton.Enabled = delayEnabled;
+        }
+
+        if (_zoneKillBoxButton is not null)
+        {
+            _zoneKillBoxButton.Enabled = killBoxEnabled;
+        }
+
+        if (_dupZoneLeftButton is not null)
+        {
+            _dupZoneLeftButton.Enabled = duplicateZoneEnabled;
+        }
+
+        if (_dupZoneRightButton is not null)
+        {
+            _dupZoneRightButton.Enabled = duplicateZoneEnabled;
+        }
+
+        if (_dupZoneUpButton is not null)
+        {
+            _dupZoneUpButton.Enabled = duplicateZoneEnabled;
+        }
+
+        if (_dupZoneDownButton is not null)
+        {
+            _dupZoneDownButton.Enabled = duplicateZoneEnabled;
+        }
+    }
+
+    private static string BuildShelterRouteAdvice(
+        ShelterRuleLibrary.ShelterRuleSpec? shelterRuleSpec,
+        IReadOnlyCollection<VisitorMarker> orderedMarkers,
+        IReadOnlyCollection<TrapZonePlan> trapZones)
+    {
+        if (shelterRuleSpec is null)
+        {
+            return "Shelter rule advisory: preset-specific cap guidance is available for shelter templates.";
+        }
+
+        var markerSlotsLeft = Math.Max(0, shelterRuleSpec.MaxVisitorMarkers - orderedMarkers.Count);
+        var zoneSlotsLeft = Math.Max(0, shelterRuleSpec.MaxTrapZones - trapZones.Count);
+        var maxSeverityInPlan = trapZones.Count == 0 ? TrapZoneSeverity.Low : trapZones.Max(zone => zone.Severity);
+
+        var markerAdvice = markerSlotsLeft switch
+        {
+            0 => "Marker cap reached: reuse existing checkpoints instead of adding new markers.",
+            1 => "One marker slot left: reserve it for missing ingress or egress.",
+            _ => $"Marker headroom: {markerSlotsLeft} slot(s) left."
+        };
+
+        var zoneAdvice = zoneSlotsLeft switch
+        {
+            0 => "Zone cap reached: expand or relabel existing zones instead of creating new ones.",
+            1 => "One trap-zone slot left: keep it for your highest-risk lane.",
+            _ => $"Trap-zone headroom: {zoneSlotsLeft} slot(s) left."
+        };
+
+        var severityAdvice = maxSeverityInPlan >= shelterRuleSpec.MaxTrapSeverity
+            ? $"Severity ceiling reached ({shelterRuleSpec.MaxTrapSeverity})."
+            : $"Severity ceiling: {shelterRuleSpec.MaxTrapSeverity}.";
+
+        return
+            $"Shelter advisory: {shelterRuleSpec.Guidance}\n" +
+            $"{markerAdvice} {zoneAdvice} {severityAdvice}";
+    }
+
+    private static int CountMarkersInsideTrapSeverity(IEnumerable<VisitorMarker> markers, IEnumerable<TrapZonePlan> zones, params TrapZoneSeverity[] severities)
+    {
+        var severitySet = severities.ToHashSet();
+        var relevantZones = zones.Where(zone => severitySet.Contains(zone.Severity)).ToList();
+        if (relevantZones.Count == 0)
+        {
+            return 0;
+        }
+
+        return markers.Count(marker => relevantZones.Any(zone => IsInsideTrapZone(marker.X, marker.Y, zone)));
+    }
+
+    private static bool IsInsideTrapZone(int x, int y, TrapZonePlan zone)
+        => x >= zone.X
+           && y >= zone.Y
+           && x < zone.X + Math.Max(1, zone.Width)
+           && y < zone.Y + Math.Max(1, zone.Height);
 
     private void PopulateVisitorMarkerEditor()
     {
@@ -2231,6 +3545,17 @@ public sealed class MainForm : Form
         }
 
         _canvas.RemoveTrapZone(trapZone.Id);
+    }
+
+    private void QuickDuplicateSelectedTrapZone(int deltaX, int deltaY)
+    {
+        if (_trapZoneList.SelectedItem is not TrapZonePlan trapZone)
+        {
+            MessageBox.Show(this, "Select a trap zone first.", "Trap editor", MessageBoxButtons.OK, MessageBoxIcon.Information);
+            return;
+        }
+
+        _canvas.QuickDuplicateTrapZone(trapZone.Id, deltaX, deltaY);
     }
 
     private void ApplyDefenseReviewNotes()
@@ -2411,6 +3736,7 @@ public sealed class MainForm : Form
             NormalizeProject(project);
             _currentPath = dialog.FileName;
             _isDirty = false;
+            _scenarioBaseline = null;
             _canvas.Project = project;
             RefreshProjectUi();
             _statusLabel.Text = $"Opened {Path.GetFileName(dialog.FileName)}.";
@@ -2489,8 +3815,23 @@ public sealed class MainForm : Form
         project.VisitorMarkers ??= new List<VisitorMarker>();
         project.TrapZones ??= new List<TrapZonePlan>();
         project.BlueprintLibrary ??= new List<BlueprintLibraryEntry>();
+        project.DeviceHub ??= new DeviceHubProfile();
+        project.DeviceHub.EnsureDefaults();
         project.DefenseReviewNotes ??= string.Empty;
         project.Name = string.IsNullOrWhiteSpace(project.Name) ? "Untitled CAMP" : project.Name;
+        if (!Enum.IsDefined(project.SnapMode))
+        {
+            project.SnapMode = SnapMode.Strict;
+        }
+        if (project.Mode == BuildMode.Shelter)
+        {
+            project.RuleProfile = RuleProfile.Shelter;
+            project.ShowCampRadiusOverlay = false;
+        }
+        else if (project.RuleProfile == RuleProfile.Shelter)
+        {
+            project.RuleProfile = RuleProfile.Strict;
+        }
         project.GridWidth = Math.Max(10, project.GridWidth);
         project.GridHeight = Math.Max(10, project.GridHeight);
         project.BudgetLimit = Math.Max(100, project.BudgetLimit);
@@ -2524,10 +3865,20 @@ public sealed class MainForm : Form
 
     private void ToggleSnapMode()
     {
-        _canvas.Project.SnapEnabled = !_canvas.Project.SnapEnabled;
+        _canvas.Project.SnapMode = _canvas.Project.SnapMode switch
+        {
+            SnapMode.Strict => SnapMode.Relaxed,
+            SnapMode.Relaxed => SnapMode.Off,
+            _ => SnapMode.Strict
+        };
         _canvas.Invalidate();
         RefreshProjectUi();
-        _statusLabel.Text = _canvas.Project.SnapEnabled ? "Smart snap enabled." : "Smart snap disabled.";
+        _statusLabel.Text = _canvas.Project.SnapMode switch
+        {
+            SnapMode.Strict => "Snap mode: Strict.",
+            SnapMode.Relaxed => "Snap mode: Relaxed.",
+            _ => "Snap mode: Off."
+        };
     }
 
     private void ApplyBudgetProfile(BudgetPlaystyleProfile profile)
@@ -2537,9 +3888,46 @@ public sealed class MainForm : Form
         {
             _canvas.Project.BudgetLimit = preset.BudgetLimit;
             _canvas.Project.StoredBudget = preset.StoredBudget;
+            if (profile == BudgetPlaystyleProfile.TrapCamp)
+            {
+                _canvas.Project.OverlayPreset = OverlayReviewPreset.TrapReview;
+            }
+            else if (profile == BudgetPlaystyleProfile.NukeCamp)
+            {
+                _canvas.Project.OverlayPreset = OverlayReviewPreset.DefenseReview;
+            }
+            else if (profile == BudgetPlaystyleProfile.ShowcaseCamp)
+            {
+                _canvas.Project.OverlayPreset = OverlayReviewPreset.Presentation;
+            }
             _statusLabel.Text = $"Budget profile applied: {profile}.";
         }
         RefreshProjectUi();
+    }
+
+    private void EnforceModeConstraints()
+    {
+        var project = _canvas.Project;
+
+        if (project.Mode == BuildMode.Shelter)
+        {
+            project.RuleProfile = RuleProfile.Shelter;
+            project.ShowCampRadiusOverlay = false;
+        }
+        else if (project.RuleProfile == RuleProfile.Shelter)
+        {
+            project.RuleProfile = RuleProfile.Strict;
+        }
+
+        var removed = project.Items.RemoveAll(item =>
+            Catalog.ById.TryGetValue(item.DefinitionId, out var definition)
+            && ((project.Mode == BuildMode.Shelter && !definition.AllowedInShelter)
+                || (project.Mode == BuildMode.SurfaceCamp && !definition.AllowedInSurface)));
+
+        if (removed > 0)
+        {
+            _statusLabel.Text = $"Mode switched to {project.Mode}. Removed {removed} incompatible item(s).";
+        }
     }
 
     private void ApplyOverlayPreset(OverlayReviewPreset preset)

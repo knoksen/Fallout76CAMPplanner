@@ -16,6 +16,13 @@ public enum RuleProfile
     Shelter
 }
 
+public enum SnapMode
+{
+    Strict,
+    Relaxed,
+    Off
+}
+
 public enum ToolType
 {
     Select,
@@ -78,6 +85,13 @@ public enum OverlayReviewPreset
     TrapReview,
     DefenseReview,
     Presentation
+}
+
+public enum ThemeProfile
+{
+    Classic,
+    WastelandDark,
+    PipBoyContrast
 }
 
 public enum TrapZoneSeverity
@@ -258,16 +272,82 @@ public sealed class TrapZonePlan
         => $"{Label} [{Severity}] {Width}x{Height} @ ({X}, {Y})";
 }
 
+public sealed class LaunchTargetProfile
+{
+    public string Label { get; set; } = "Target";
+    public string Target { get; set; } = string.Empty;
+    public string Notes { get; set; } = string.Empty;
+}
+
+public sealed class DeviceHubProfile
+{
+    public string GitHubRepositoryUrl { get; set; } = "https://github.com/knoksen/Fallout76CAMPplanner";
+    public string SourceForgeUrl { get; set; } = string.Empty;
+    public string FalloutDocsTarget { get; set; } = "README.md";
+    public string MobileCompanionUrl { get; set; } = string.Empty;
+    public string MobileExportFolder { get; set; } = "exports/mobile";
+    public string ConsoleInstructions { get; set; } = "Configure Xbox/PlayStation/Generic targets with URLs or local docs.";
+    public LaunchTargetProfile Xbox { get; set; } = new() { Label = "Xbox" };
+    public LaunchTargetProfile PlayStation { get; set; } = new() { Label = "PlayStation" };
+    public LaunchTargetProfile GenericConsole { get; set; } = new() { Label = "Generic Console" };
+
+    public void EnsureDefaults()
+    {
+        GitHubRepositoryUrl = string.IsNullOrWhiteSpace(GitHubRepositoryUrl)
+            ? "https://github.com/knoksen/Fallout76CAMPplanner"
+            : GitHubRepositoryUrl.Trim();
+        SourceForgeUrl = SourceForgeUrl?.Trim() ?? string.Empty;
+        FalloutDocsTarget = string.IsNullOrWhiteSpace(FalloutDocsTarget) ? "README.md" : FalloutDocsTarget.Trim();
+        MobileCompanionUrl = MobileCompanionUrl?.Trim() ?? string.Empty;
+        MobileExportFolder = string.IsNullOrWhiteSpace(MobileExportFolder) ? "exports/mobile" : MobileExportFolder.Trim();
+        ConsoleInstructions = ConsoleInstructions?.Trim() ?? string.Empty;
+
+        Xbox ??= new LaunchTargetProfile();
+        PlayStation ??= new LaunchTargetProfile();
+        GenericConsole ??= new LaunchTargetProfile();
+
+        Xbox.Label = string.IsNullOrWhiteSpace(Xbox.Label) ? "Xbox" : Xbox.Label.Trim();
+        PlayStation.Label = string.IsNullOrWhiteSpace(PlayStation.Label) ? "PlayStation" : PlayStation.Label.Trim();
+        GenericConsole.Label = string.IsNullOrWhiteSpace(GenericConsole.Label) ? "Generic Console" : GenericConsole.Label.Trim();
+
+        Xbox.Target = Xbox.Target?.Trim() ?? string.Empty;
+        PlayStation.Target = PlayStation.Target?.Trim() ?? string.Empty;
+        GenericConsole.Target = GenericConsole.Target?.Trim() ?? string.Empty;
+
+        Xbox.Notes = Xbox.Notes?.Trim() ?? string.Empty;
+        PlayStation.Notes = PlayStation.Notes?.Trim() ?? string.Empty;
+        GenericConsole.Notes = GenericConsole.Notes?.Trim() ?? string.Empty;
+    }
+}
+
 public sealed class PlannerProject
 {
     public string Name { get; set; } = "Untitled CAMP";
     public string PresetId { get; set; } = "custom";
     public BuildMode Mode { get; set; } = BuildMode.SurfaceCamp;
     public RuleProfile RuleProfile { get; set; } = RuleProfile.Strict;
-    public bool SnapEnabled { get; set; } = true;
+    public SnapMode SnapMode { get; set; } = SnapMode.Strict;
+
+    [JsonIgnore]
+    public bool SnapEnabled => SnapMode != SnapMode.Off;
+
+    [JsonPropertyName("SnapEnabled")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public bool? LegacySnapEnabled
+    {
+        get => null;
+        set
+        {
+            if (value.HasValue)
+            {
+                SnapMode = value.Value ? SnapMode.Strict : SnapMode.Off;
+            }
+        }
+    }
     public CampSlot ActiveCampSlot { get; set; } = CampSlot.Slot1;
     public BudgetPlaystyleProfile BudgetProfile { get; set; } = BudgetPlaystyleProfile.Builder;
     public OverlayReviewPreset OverlayPreset { get; set; } = OverlayReviewPreset.Balanced;
+    public ThemeProfile ThemeProfile { get; set; } = ThemeProfile.Classic;
     public int BudgetLimit { get; set; } = 1000;
     public int StoredBudget { get; set; }
     public int GridWidth { get; set; } = 40;
@@ -282,6 +362,7 @@ public sealed class PlannerProject
     public int CampCenterX { get; set; } = -1;
     public int CampCenterY { get; set; } = -1;
     public string DefenseReviewNotes { get; set; } = string.Empty;
+    public DeviceHubProfile DeviceHub { get; set; } = new();
     public List<VisitorMarker> VisitorMarkers { get; set; } = new();
     public List<TrapZonePlan> TrapZones { get; set; } = new();
     public List<BlueprintLibraryEntry> BlueprintLibrary { get; set; } = new();
@@ -538,16 +619,58 @@ public static class Catalog
 
 public static class BudgetProfileLibrary
 {
-    public static readonly IReadOnlyDictionary<BudgetPlaystyleProfile, (int BudgetLimit, int StoredBudget, string Description)> Profiles =
-        new Dictionary<BudgetPlaystyleProfile, (int BudgetLimit, int StoredBudget, string Description)>
+    public sealed record BudgetProfileSpec(
+        int BudgetLimit,
+        int StoredBudget,
+        string Description,
+        int RecommendedTurrets,
+        int RecommendedDefenseItems,
+        int RecommendedIngressMarkers,
+        int RecommendedTrapZones);
+
+    public static readonly IReadOnlyDictionary<BudgetPlaystyleProfile, BudgetProfileSpec> Profiles =
+        new Dictionary<BudgetPlaystyleProfile, BudgetProfileSpec>
         {
-            [BudgetPlaystyleProfile.Builder] = (1200, 120, "Balanced build profile for general construction and iteration."),
-            [BudgetPlaystyleProfile.TrapCamp] = (1400, 200, "Higher reserve for trap routing and layered control zones."),
-            [BudgetPlaystyleProfile.VendorCamp] = (1100, 140, "Commerce-focused profile with budget room for vendor frontage."),
-            [BudgetPlaystyleProfile.UtilityCamp] = (1150, 160, "Utility-heavy profile for workbench and infrastructure density."),
-            [BudgetPlaystyleProfile.NukeCamp] = (1500, 220, "Aggressive defense and launch-route profile."),
-            [BudgetPlaystyleProfile.ShowcaseCamp] = (1300, 100, "Presentation-forward profile for decor and layout clarity.")
+            [BudgetPlaystyleProfile.Builder] = new BudgetProfileSpec(1200, 120, "Balanced build profile for general construction and iteration.", 3, 6, 1, 1),
+            [BudgetPlaystyleProfile.TrapCamp] = new BudgetProfileSpec(1400, 200, "Higher reserve for trap routing and layered control zones.", 4, 8, 1, 3),
+            [BudgetPlaystyleProfile.VendorCamp] = new BudgetProfileSpec(1100, 140, "Commerce-focused profile with budget room for vendor frontage.", 2, 4, 1, 1),
+            [BudgetPlaystyleProfile.UtilityCamp] = new BudgetProfileSpec(1150, 160, "Utility-heavy profile for workbench and infrastructure density.", 3, 5, 1, 1),
+            [BudgetPlaystyleProfile.NukeCamp] = new BudgetProfileSpec(1500, 220, "Aggressive defense and launch-route profile.", 6, 10, 2, 2),
+            [BudgetPlaystyleProfile.ShowcaseCamp] = new BudgetProfileSpec(1300, 100, "Presentation-forward profile for decor and layout clarity.", 2, 4, 1, 1)
         };
+}
+
+public static class ShelterRuleLibrary
+{
+    public sealed record ShelterRuleSpec(
+        int MaxTurrets,
+        int MaxVisitorMarkers,
+        int MaxTrapZones,
+        TrapZoneSeverity MaxTrapSeverity,
+        string Guidance);
+
+    public static readonly IReadOnlyDictionary<string, ShelterRuleSpec> ByPresetId =
+        new Dictionary<string, ShelterRuleSpec>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["vault-lobby"] = new ShelterRuleSpec(5, 10, 4, TrapZoneSeverity.High, "Balanced shelter flow with moderate trap layering."),
+            ["vault-utility"] = new ShelterRuleSpec(3, 6, 3, TrapZoneSeverity.High, "Compact utility shell; prioritize clear movement lanes."),
+            ["missile-silo"] = new ShelterRuleSpec(8, 14, 6, TrapZoneSeverity.Critical, "High-intensity route control profile for long corridors."),
+            ["nuclear-bunker"] = new ShelterRuleSpec(6, 12, 5, TrapZoneSeverity.Critical, "Segmented bunker profile with layered defensive fallback."),
+            ["flatlands"] = new ShelterRuleSpec(7, 12, 5, TrapZoneSeverity.High, "Wide layout profile focused on coverage spacing."),
+            ["triumph-terrace"] = new ShelterRuleSpec(4, 10, 3, TrapZoneSeverity.Medium, "Presentation-first profile with controlled trap intensity."),
+            ["wrangler-casino"] = new ShelterRuleSpec(3, 9, 3, TrapZoneSeverity.Medium, "Social/event profile where readability and flow are prioritized.")
+        };
+
+    public static bool TryGetForPreset(string? presetId, out ShelterRuleSpec spec)
+    {
+        if (!string.IsNullOrWhiteSpace(presetId) && ByPresetId.TryGetValue(presetId, out spec!))
+        {
+            return true;
+        }
+
+        spec = null!;
+        return false;
+    }
 }
 
 public static class PresetLibrary
