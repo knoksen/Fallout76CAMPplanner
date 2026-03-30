@@ -2,3 +2,7 @@
 
 #Ignore vscode AI rules
 .github\instructions\codacy.instructions.md
+
+# Build artifacts
+Knoksen_FO76_CAMP_Planner_Win10/bin/
+Knoksen_FO76_CAMP_Planner_Win10/obj/
