@@ -65,9 +65,9 @@ public sealed class MainForm : Form
     private CheckBox? _showTurretCoverageCheck;
     private CheckBox? _showVisitorFlowCheck;
     private CheckBox? _showTrapZonesCheck;
-    private string? _currentPath;
-    private bool _suppressUiEvents;
-    private bool _isDirty;
+    private string? _currentProjectFilePath;
+    private bool _isSuppressingUiEvents;
+    private bool _hasUnsavedChanges;
 
     private static readonly Color BgApp = Color.FromArgb(18, 22, 28);
     private static readonly Color BgPanel = Color.FromArgb(27, 33, 41);
@@ -673,7 +673,7 @@ public sealed class MainForm : Form
         _snapEnabledCheck.Margin = new Padding(0, 4, 0, 2);
         _snapEnabledCheck.CheckedChanged += (_, _) =>
         {
-            if (_suppressUiEvents) return;
+            if (_isSuppressingUiEvents) return;
             _canvas.Project.SnapEnabled = _snapEnabledCheck.Checked;
             _canvas.Invalidate();
             RefreshProjectUi();
@@ -759,7 +759,7 @@ public sealed class MainForm : Form
         var flow = BuildVerticalFlow();
         _showCampRadiusCheck = BuildCheck("Show CAMP radius overlay", true, (_, _) =>
         {
-            if (_suppressUiEvents) return;
+            if (_isSuppressingUiEvents) return;
             _canvas.Project.ShowCampRadiusOverlay = _showCampRadiusCheck?.Checked ?? true;
             _canvas.Invalidate();
             RefreshProjectUi();
@@ -767,7 +767,7 @@ public sealed class MainForm : Form
 
         _showTurretCoverageCheck = BuildCheck("Show turret coverage", true, (_, _) =>
         {
-            if (_suppressUiEvents) return;
+            if (_isSuppressingUiEvents) return;
             _canvas.Project.ShowTurretCoverage = _showTurretCoverageCheck?.Checked ?? true;
             _canvas.Invalidate();
             RefreshProjectUi();
@@ -775,7 +775,7 @@ public sealed class MainForm : Form
 
         _showVisitorFlowCheck = BuildCheck("Show visitor flow", true, (_, _) =>
         {
-            if (_suppressUiEvents) return;
+            if (_isSuppressingUiEvents) return;
             _canvas.Project.ShowVisitorFlowOverlay = _showVisitorFlowCheck?.Checked ?? true;
             _canvas.Invalidate();
             RefreshProjectUi();
@@ -783,7 +783,7 @@ public sealed class MainForm : Form
 
         _showTrapZonesCheck = BuildCheck("Show trap zones", true, (_, _) =>
         {
-            if (_suppressUiEvents) return;
+            if (_isSuppressingUiEvents) return;
             _canvas.Project.ShowTrapZonesOverlay = _showTrapZonesCheck?.Checked ?? true;
             _canvas.Invalidate();
             RefreshProjectUi();
@@ -977,7 +977,7 @@ public sealed class MainForm : Form
             };
             check.CheckedChanged += (_, _) =>
             {
-                if (_suppressUiEvents) return;
+                if (_isSuppressingUiEvents) return;
                 _canvas.SetLayerVisibility(layer, check.Checked);
             };
 
@@ -992,7 +992,7 @@ public sealed class MainForm : Form
             };
             lockCheck.CheckedChanged += (_, _) =>
             {
-                if (_suppressUiEvents) return;
+                if (_isSuppressingUiEvents) return;
                 _canvas.SetLayerLocked(layer, lockCheck.Checked);
             };
 
@@ -1113,7 +1113,7 @@ public sealed class MainForm : Form
         _campSlotCombo.DataSource = Enum.GetValues<CampSlot>();
         _campSlotCombo.SelectedIndexChanged += (_, _) =>
         {
-            if (_suppressUiEvents) return;
+            if (_isSuppressingUiEvents) return;
             if (_campSlotCombo.SelectedItem is CampSlot slot)
             {
                 _canvas.Project.ActiveCampSlot = slot;
@@ -1439,7 +1439,7 @@ public sealed class MainForm : Form
         _inspectorNoteText.Leave += (_, _) => ApplyInspectorChanges();
         _inspectorRotationInput.ValueChanged += (_, _) =>
         {
-            if (!_suppressUiEvents && _canvas.SelectedItems.Count == 1)
+            if (!_isSuppressingUiEvents && _canvas.SelectedItems.Count == 1)
             {
                 ApplyInspectorChanges();
             }
@@ -1447,7 +1447,7 @@ public sealed class MainForm : Form
 
         _projectNameText.TextChanged += (_, _) =>
         {
-            if (_suppressUiEvents) return;
+            if (_isSuppressingUiEvents) return;
             _canvas.Project.Name = string.IsNullOrWhiteSpace(_projectNameText.Text) ? "Untitled CAMP" : _projectNameText.Text.Trim();
             _canvas.Invalidate();
             RefreshProjectUi();
@@ -1455,7 +1455,7 @@ public sealed class MainForm : Form
 
         _modeCombo.SelectedIndexChanged += (_, _) =>
         {
-            if (_suppressUiEvents) return;
+            if (_isSuppressingUiEvents) return;
             if (_modeCombo.SelectedItem is BuildMode mode)
             {
                 _canvas.Project.Mode = mode;
@@ -1466,7 +1466,7 @@ public sealed class MainForm : Form
 
         _ruleCombo.SelectedIndexChanged += (_, _) =>
         {
-            if (_suppressUiEvents) return;
+            if (_isSuppressingUiEvents) return;
             if (_ruleCombo.SelectedItem is RuleProfile profile)
             {
                 _canvas.Project.RuleProfile = profile;
@@ -1477,21 +1477,21 @@ public sealed class MainForm : Form
 
         _budgetLimitInput.ValueChanged += (_, _) =>
         {
-            if (_suppressUiEvents) return;
+            if (_isSuppressingUiEvents) return;
             _canvas.Project.BudgetLimit = (int)_budgetLimitInput.Value;
             RefreshProjectUi();
         };
 
         _storedBudgetInput.ValueChanged += (_, _) =>
         {
-            if (_suppressUiEvents) return;
+            if (_isSuppressingUiEvents) return;
             _canvas.Project.StoredBudget = (int)_storedBudgetInput.Value;
             RefreshProjectUi();
         };
 
         _budgetProfileCombo.SelectedIndexChanged += (_, _) =>
         {
-            if (_suppressUiEvents) return;
+            if (_isSuppressingUiEvents) return;
             if (_budgetProfileCombo.SelectedItem is BudgetPlaystyleProfile profile)
             {
                 ApplyBudgetProfile(profile);
@@ -1500,7 +1500,7 @@ public sealed class MainForm : Form
 
         _overlayPresetCombo.SelectedIndexChanged += (_, _) =>
         {
-            if (_suppressUiEvents) return;
+            if (_isSuppressingUiEvents) return;
             if (_overlayPresetCombo.SelectedItem is OverlayReviewPreset preset)
             {
                 ApplyOverlayPreset(preset);
@@ -1509,7 +1509,7 @@ public sealed class MainForm : Form
 
         _gridWidthInput.ValueChanged += (_, _) =>
         {
-            if (_suppressUiEvents) return;
+            if (_isSuppressingUiEvents) return;
             _canvas.Project.GridWidth = (int)_gridWidthInput.Value;
             _canvas.Invalidate();
             RefreshProjectUi();
@@ -1517,7 +1517,7 @@ public sealed class MainForm : Form
 
         _gridHeightInput.ValueChanged += (_, _) =>
         {
-            if (_suppressUiEvents) return;
+            if (_isSuppressingUiEvents) return;
             _canvas.Project.GridHeight = (int)_gridHeightInput.Value;
             _canvas.Invalidate();
             RefreshProjectUi();
@@ -1525,7 +1525,7 @@ public sealed class MainForm : Form
 
         _zoomInput.ValueChanged += (_, _) =>
         {
-            if (_suppressUiEvents) return;
+            if (_isSuppressingUiEvents) return;
             _canvas.ZoomPercent = (int)_zoomInput.Value;
         };
 
@@ -1535,7 +1535,7 @@ public sealed class MainForm : Form
 
         _itemList.SelectedIndexChanged += (_, _) =>
         {
-            if (_suppressUiEvents) return;
+            if (_isSuppressingUiEvents) return;
             var ids = _itemList.SelectedItems.OfType<ItemListEntry>().Select(x => x.Item.Id).ToList();
             _canvas.SelectItems(ids);
             if (ids.Count > 0)
@@ -1560,8 +1560,8 @@ public sealed class MainForm : Form
 
     private void NewProject()
     {
-        _currentPath = null;
-        _isDirty = false;
+        _currentProjectFilePath = null;
+        _hasUnsavedChanges = false;
         _canvas.Project = PresetLibrary.GetById("custom").CreateProject();
         _canvas.Project.Name = "Knoksen Foundation Draft";
         SetActiveTool(ToolType.Foundation);
@@ -1580,8 +1580,8 @@ public sealed class MainForm : Form
             return;
         }
 
-        _currentPath = null;
-        _isDirty = false;
+        _currentProjectFilePath = null;
+        _hasUnsavedChanges = false;
         _canvas.Project = preset.CreateProject();
         SetActiveTool(ToolType.Foundation);
         RefreshProjectUi();
@@ -1592,10 +1592,10 @@ public sealed class MainForm : Form
 
     private void RefreshProjectUi()
     {
-        _suppressUiEvents = true;
+        _isSuppressingUiEvents = true;
         try
         {
-            var project = NormalizeProject(_canvas.Project);
+            var project = EnsureProjectDefaults(_canvas.Project);
 
             if (_projectNameText.Text != project.Name)
             {
@@ -1679,7 +1679,7 @@ public sealed class MainForm : Form
         }
         finally
         {
-            _suppressUiEvents = false;
+            _isSuppressingUiEvents = false;
         }
     }
 
@@ -1696,8 +1696,8 @@ public sealed class MainForm : Form
             filtered = filtered.Where(item =>
             {
                 Catalog.ById.TryGetValue(item.DefinitionId, out var def);
-                var hay = $"{def?.Name} {item.Note} {item.X} {item.Y}";
-                return hay.Contains(query, StringComparison.OrdinalIgnoreCase);
+                var itemSearchText = $"{def?.Name} {item.Note} {item.X} {item.Y}";
+                return itemSearchText.Contains(query, StringComparison.OrdinalIgnoreCase);
             });
         }
 
@@ -1853,7 +1853,7 @@ public sealed class MainForm : Form
 
     private void ApplyInspectorChanges()
     {
-        if (_suppressUiEvents || _canvas.SelectedItems.Count != 1)
+        if (_isSuppressingUiEvents || _canvas.SelectedItems.Count != 1)
         {
             return;
         }
@@ -1927,7 +1927,7 @@ public sealed class MainForm : Form
     private void RefreshSelectionUi()
     {
         var selected = _canvas.SelectedItems;
-        _suppressUiEvents = true;
+        _isSuppressingUiEvents = true;
         try
         {
             if (selected.Count == 0)
@@ -1993,7 +1993,7 @@ public sealed class MainForm : Form
         }
         finally
         {
-            _suppressUiEvents = false;
+            _isSuppressingUiEvents = false;
         }
     }
 
@@ -2408,9 +2408,9 @@ public sealed class MainForm : Form
                 throw new InvalidOperationException("Could not deserialize project file.");
             }
 
-            NormalizeProject(project);
-            _currentPath = dialog.FileName;
-            _isDirty = false;
+            EnsureProjectDefaults(project);
+            _currentProjectFilePath = dialog.FileName;
+            _hasUnsavedChanges = false;
             _canvas.Project = project;
             RefreshProjectUi();
             _statusLabel.Text = $"Opened {Path.GetFileName(dialog.FileName)}.";
@@ -2423,7 +2423,7 @@ public sealed class MainForm : Form
 
     private void SaveProject(bool forceChoosePath)
     {
-        var path = _currentPath;
+        var path = _currentProjectFilePath;
         if (forceChoosePath || string.IsNullOrWhiteSpace(path))
         {
             using var dialog = new SaveFileDialog
@@ -2439,14 +2439,14 @@ public sealed class MainForm : Form
             }
 
             path = dialog.FileName;
-            _currentPath = path;
+            _currentProjectFilePath = path;
         }
 
         try
         {
             var json = JsonSerializer.Serialize(_canvas.Project, AppJson.Default);
             File.WriteAllText(path!, json);
-            _isDirty = false;
+            _hasUnsavedChanges = false;
             _statusLabel.Text = $"Saved {Path.GetFileName(path)}.";
         }
         catch (Exception ex)
@@ -2481,7 +2481,7 @@ public sealed class MainForm : Form
         }
     }
 
-    private static PlannerProject NormalizeProject(PlannerProject project)
+    private static PlannerProject EnsureProjectDefaults(PlannerProject project)
     {
         project.PresetId = string.IsNullOrWhiteSpace(project.PresetId) ? "custom" : project.PresetId;
         project.LayerVisibility ??= new LayerVisibilitySettings();
@@ -2588,7 +2588,7 @@ public sealed class MainForm : Form
 
     private void UpdateWindowTitle()
     {
-        var dirtyPrefix = _isDirty ? "* " : string.Empty;
+        var dirtyPrefix = _hasUnsavedChanges ? "* " : string.Empty;
         var projectName = string.IsNullOrWhiteSpace(_canvas.Project.Name) ? "Untitled CAMP" : _canvas.Project.Name;
         Text = $"{dirtyPrefix}FO76 CAMP Planner - {projectName}";
     }
@@ -2626,7 +2626,7 @@ public sealed class MainForm : Form
 
     private void MarkDirty()
     {
-        _isDirty = true;
+        _hasUnsavedChanges = true;
         UpdateWindowTitle();
     }
 
