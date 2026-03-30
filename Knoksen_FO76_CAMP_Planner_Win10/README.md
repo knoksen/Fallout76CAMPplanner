@@ -37,13 +37,9 @@ Plan your Fallout 76 base before you place a single brick. FO76 CAMP Planner giv
 
 ## Screenshots
 
-| Overview | Defense & Overlays |
+| Overview | Analysis & Blueprints |
 |---|---|
-| ![Planner overview](../assets/screenshots/planner-overview.png) | ![Canvas with defense overlays](../assets/screenshots/canvas-defense.png) |
-
-| Visitor Flow | Trap Zones |
-|---|---|
-| ![Visitor flow planning](../assets/screenshots/visitor-flow.png) | ![Trap zone editor](../assets/screenshots/trap-zones.png) |
+| ![Planner overview](https://github.com/user-attachments/assets/1975c46b-8103-4659-8106-ab01b5a2f7b2) | ![Analysis and stored blueprints](https://github.com/user-attachments/assets/3939d7e0-28fa-48a2-b49f-15f8dfbf24a5) |
 
 ---
 
