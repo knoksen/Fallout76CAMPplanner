@@ -22,6 +22,8 @@ public sealed class PlannerCanvas : Control
     private BlueprintModule? _loadedBlueprint;
     private bool _hoverGridValid;
     private Point _hoverGrid;
+    private PlacedItem? _hoverItem;
+    private ToolType _currentTool = ToolType.Select;
     private Guid? _draggingMarkerId;
     private PlannerProject? _dragMarkerSnapshot;
     private bool _dragMarkerChanged;
@@ -55,7 +57,22 @@ public sealed class PlannerCanvas : Control
         }
     }
 
-    public ToolType CurrentTool { get; set; } = ToolType.Select;
+    public ToolType CurrentTool
+    {
+        get => _currentTool;
+        set
+        {
+            if (_currentTool == value)
+            {
+                return;
+            }
+
+            _currentTool = value;
+            _hoverItem = null;
+            UpdateCursor();
+            Invalidate();
+        }
+    }
 
     public int ZoomPercent
     {
@@ -102,6 +119,7 @@ public sealed class PlannerCanvas : Control
         DrawVisitorFlow(e.Graphics, origin, cell);
         DrawTrapZones(e.Graphics, origin, cell);
         DrawItems(e.Graphics, origin, cell);
+        DrawHoverFeedback(e.Graphics, origin, cell);
         DrawSelection(e.Graphics, origin, cell);
         DrawPlacementPreview(e.Graphics, origin, cell);
         DrawBlueprintGhost(e.Graphics, origin, cell);
@@ -128,6 +146,7 @@ public sealed class PlannerCanvas : Control
                 _draggingMarkerId = markerHit.Id;
                 _dragMarkerSnapshot = CloneProject(_project);
                 _dragMarkerChanged = false;
+                UpdateCursor();
                 StatusMessage?.Invoke(this, $"Dragging marker '{markerHit.Label}'.");
                 return;
             }
@@ -140,6 +159,7 @@ public sealed class PlannerCanvas : Control
                 _dragTrapZoneChanged = false;
                 _dragTrapStartGrid = gridPoint;
                 _dragTrapStartRect = new Rectangle(trapResizeHit.X, trapResizeHit.Y, trapResizeHit.Width, trapResizeHit.Height);
+                UpdateCursor();
                 StatusMessage?.Invoke(this, $"Resizing trap zone '{trapResizeHit.Label}'.");
                 return;
             }
@@ -152,6 +172,7 @@ public sealed class PlannerCanvas : Control
                 _dragTrapZoneChanged = false;
                 _dragTrapStartGrid = gridPoint;
                 _dragTrapStartRect = new Rectangle(trapMoveHit.X, trapMoveHit.Y, trapMoveHit.Width, trapMoveHit.Height);
+                UpdateCursor();
                 StatusMessage?.Invoke(this, $"Dragging trap zone '{trapMoveHit.Label}'.");
                 return;
             }
@@ -189,6 +210,7 @@ public sealed class PlannerCanvas : Control
                     _dragChanged = false;
                     _dragStartGrid = gridPoint;
                     _dragStartSnapshot = CloneProject(_project);
+                    UpdateCursor();
                 }
 
                 Invalidate();
@@ -285,6 +307,22 @@ public sealed class PlannerCanvas : Control
         else
         {
             _hoverGridValid = false;
+        }
+
+        // Update hovered item tracking for visual feedback when not in an active drag operation
+        if (!_draggingSelection && !_marqueeSelecting && _draggingMarkerId is null && _draggingTrapZoneId is null)
+        {
+            var newHoverItem = (_hoverGridValid && _currentTool is ToolType.Select or ToolType.Erase)
+                ? HitTest(_hoverGrid)
+                : null;
+
+            if (!ReferenceEquals(newHoverItem, _hoverItem))
+            {
+                _hoverItem = newHoverItem;
+                Invalidate();
+            }
+
+            UpdateCursor();
         }
 
         if (_marqueeSelecting)
@@ -472,6 +510,7 @@ public sealed class PlannerCanvas : Control
             _draggingMarkerId = null;
             _dragMarkerSnapshot = null;
             _dragMarkerChanged = false;
+            UpdateCursor();
             return;
         }
 
@@ -488,6 +527,7 @@ public sealed class PlannerCanvas : Control
             _dragTrapZoneSnapshot = null;
             _dragTrapZoneChanged = false;
             _resizingTrapZone = false;
+            UpdateCursor();
             return;
         }
 
@@ -502,6 +542,7 @@ public sealed class PlannerCanvas : Control
             }
 
             _dragStartSnapshot = null;
+            UpdateCursor();
         }
     }
 
@@ -509,6 +550,7 @@ public sealed class PlannerCanvas : Control
     {
         base.OnMouseLeave(e);
         _hoverGridValid = false;
+        _hoverItem = null;
 
         if (_draggingMarkerId is not null)
         {
@@ -525,6 +567,7 @@ public sealed class PlannerCanvas : Control
             _resizingTrapZone = false;
         }
 
+        Cursor = Cursors.Default;
         Invalidate();
     }
 
@@ -2131,6 +2174,76 @@ public sealed class PlannerCanvas : Control
             g.FillRectangle(fill, rect);
             g.DrawRectangle(pen, rect);
         }
+    }
+
+    private void DrawHoverFeedback(Graphics g, Point origin, int cell)
+    {
+        if (!_hoverGridValid || _draggingSelection || _marqueeSelecting)
+        {
+            return;
+        }
+
+        // Placement tool: subtle hover cell highlight to show active cursor grid position
+        if (_currentTool is not ToolType.Select and not ToolType.Erase)
+        {
+            var hoverRect = new Rectangle(origin.X + _hoverGrid.X * cell, origin.Y + _hoverGrid.Y * cell, cell, cell);
+            using var cellFill = new SolidBrush(Color.FromArgb(30, 200, 220, 255));
+            g.FillRectangle(cellFill, hoverRect);
+            return;
+        }
+
+        if (_hoverItem is null)
+        {
+            return;
+        }
+
+        if (!Catalog.ById.TryGetValue(_hoverItem.DefinitionId, out var definition)
+            || !_project.LayerVisibility.IsVisible(definition.Layer))
+        {
+            return;
+        }
+
+        var size = GetSize(definition, _hoverItem.Rotation);
+        var rect = new Rectangle(
+            origin.X + _hoverItem.X * cell,
+            origin.Y + _hoverItem.Y * cell,
+            size.Width * cell,
+            size.Height * cell);
+
+        if (_currentTool == ToolType.Erase)
+        {
+            // Red warning highlight: confirms which item will be deleted
+            using var fill = new SolidBrush(Color.FromArgb(60, 255, 70, 70));
+            using var pen = new Pen(Color.FromArgb(210, 255, 80, 80), 2.2f);
+            g.FillRectangle(fill, rect);
+            g.DrawRectangle(pen, rect);
+        }
+        else if (!_selectedIds.Contains(_hoverItem.Id))
+        {
+            // Select mode: white pre-highlight glow for unselected items only
+            using var fill = new SolidBrush(Color.FromArgb(28, 255, 255, 255));
+            using var pen = new Pen(Color.FromArgb(150, 210, 225, 245), 1.8f);
+            g.FillRectangle(fill, rect);
+            g.DrawRectangle(pen, rect);
+        }
+    }
+
+    private void UpdateCursor()
+    {
+        if (_draggingSelection || _draggingMarkerId is not null || _draggingTrapZoneId is not null)
+        {
+            Cursor = Cursors.SizeAll;
+            return;
+        }
+
+        Cursor = _currentTool switch
+        {
+            ToolType.Select when _hoverItem is not null => Cursors.Hand,
+            ToolType.Select => Cursors.Default,
+            ToolType.Erase when _hoverItem is not null => Cursors.No,
+            ToolType.Erase => Cursors.Cross,
+            _ => Cursors.Cross
+        };
     }
 
     private void DrawPlacementPreview(Graphics g, Point origin, int cell)
