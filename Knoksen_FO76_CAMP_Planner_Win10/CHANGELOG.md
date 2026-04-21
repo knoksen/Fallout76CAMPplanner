@@ -6,6 +6,18 @@ All notable changes to FO76 CAMP Planner are documented in this file. This proje
 
 ## [Unreleased]
 
+### UI/UX Polish Sprint (WinForms-focused) – canvas readability pass
+
+#### Improved canvas visual feedback
+- Added hover cell highlight in placement-tool modes to show the active cursor grid position before placing an item.
+- Added hover pre-highlight (white glow outline) on items in Select mode to indicate interactive targets before clicking.
+- Added red hover warning highlight in Erase mode to confirm exactly which item will be deleted on click.
+- Added context-aware cursor changes per active tool:
+  - `Hand` cursor when hovering over a selectable item in Select mode.
+  - `Cross` cursor for all placement tools and for Erase mode when not hovering an item.
+  - `No` cursor when hovering over a deletable item in Erase mode.
+  - `SizeAll` cursor during active item, marker, or trap-zone drag operations.
+
 ### Foundation Release (v1.0) – release preparation pass
 
 #### Implemented

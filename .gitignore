@@ -4,8 +4,18 @@
 .github\instructions\codacy.instructions.md
 
 # Build artifacts
+Knoksen_FO76_CAMP_Planner_Win10/bin/
+Knoksen_FO76_CAMP_Planner_Win10/obj/
 bin/
 obj/
+
+# Build logs
+build_logs/
+
+# Release packages
+releases/
+
+# IDE artifacts
 *.user
 *.suo
 .vs/
