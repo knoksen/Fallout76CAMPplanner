@@ -1902,8 +1902,7 @@ public sealed class MainForm : Form
     {
         _currentProjectFilePath = null;
         _hasUnsavedChanges = false;
-        _scenarioBaseline = null;
-        _canvas.Project = PresetLibrary.GetById("custom").CreateProject();
+
         _canvas.Project.Name = "Knoksen Foundation Draft";
         SetActiveTool(ToolType.Foundation);
         _zoomInput.Value = 100;
@@ -1923,8 +1922,7 @@ public sealed class MainForm : Form
 
         _currentProjectFilePath = null;
         _hasUnsavedChanges = false;
-        _scenarioBaseline = null;
-        _canvas.Project = preset.CreateProject();
+
         SetActiveTool(ToolType.Foundation);
         RefreshProjectUi();
         RefreshBlueprintUi();
@@ -2497,9 +2495,10 @@ public sealed class MainForm : Form
     {
         var profile = _canvas.Project.DeviceHub;
         var configured = string.IsNullOrWhiteSpace(profile.MobileExportFolder) ? "exports/mobile" : profile.MobileExportFolder.Trim();
+        // Normalize to resolve any ".." sequences before creating the directory
         var folder = Path.IsPathRooted(configured)
-            ? configured
-            : Path.Combine(GetWorkspaceRootPath(), configured);
+            ? Path.GetFullPath(configured)
+            : Path.GetFullPath(Path.Combine(GetWorkspaceRootPath(), configured));
 
         Directory.CreateDirectory(folder);
         return folder;
@@ -2539,10 +2538,12 @@ public sealed class MainForm : Form
         var trimmed = target.Trim();
         if (Path.IsPathRooted(trimmed))
         {
-            return trimmed;
+            // Normalize to resolve any embedded ".." sequences in absolute paths
+            return Path.GetFullPath(trimmed);
         }
 
-        return Path.Combine(GetWorkspaceRootPath(), trimmed);
+        // Compose with workspace root then normalize — prevents traversal via "../.." in relative paths
+        return Path.GetFullPath(Path.Combine(GetWorkspaceRootPath(), trimmed));
     }
 
     private bool IsOpenableTarget(string? target, string resolvedPath)

@@ -325,6 +325,22 @@ public sealed class PlannerCanvas : Control
             UpdateCursor();
         }
 
+        // Update hovered item tracking for visual feedback when not in an active drag operation
+        if (!_draggingSelection && !_marqueeSelecting && _draggingMarkerId is null && _draggingTrapZoneId is null)
+        {
+            var newHoverItem = (_isHoverGridValid && _currentTool is ToolType.Select or ToolType.Erase)
+                ? FindItemAtGridPoint(_hoverGrid)
+                : null;
+
+            if (!ReferenceEquals(newHoverItem, _hoverItem))
+            {
+                _hoverItem = newHoverItem;
+                Invalidate();
+            }
+
+            UpdateCursor();
+        }
+
         if (_marqueeSelecting)
         {
             if (_isHoverGridValid)
