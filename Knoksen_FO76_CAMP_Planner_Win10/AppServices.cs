@@ -8,12 +8,18 @@ internal static class AppJson
     public static readonly JsonSerializerOptions Default = new()
     {
         WriteIndented = true,
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        // Guard against deeply nested or excessively large JSON payloads
+        MaxDepth = 64
     };
 }
 
 internal static class AppDiagnostics
 {
+    private const long MaxLogSizeBytes = 1 * 1024 * 1024; // 1 MB — rotate before growing unbounded
+
+    private static readonly object LogLock = new();
+
     private static readonly string LogPath = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
         "FO76CampPlanner_Error.log");
@@ -22,7 +28,17 @@ internal static class AppDiagnostics
     {
         try
         {
-            File.AppendAllText(LogPath, message + Environment.NewLine);
+            lock (LogLock)
+            {
+                var fileInfo = new FileInfo(LogPath);
+                if (fileInfo.Exists && fileInfo.Length > MaxLogSizeBytes)
+                {
+                    // Rotate: overwrite the backup and start a fresh log
+                    File.Move(LogPath, LogPath + ".old", overwrite: true);
+                }
+
+                File.AppendAllText(LogPath, message + Environment.NewLine);
+            }
         }
         catch
         {

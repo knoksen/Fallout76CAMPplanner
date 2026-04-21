@@ -15,3 +15,7 @@ build_logs/
 # Release packages
 releases/
 
+# IDE artifacts
+*.user
+*.suo
+.vs/
