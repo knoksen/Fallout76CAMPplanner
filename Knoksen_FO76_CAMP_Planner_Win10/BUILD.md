@@ -80,6 +80,16 @@ This script:
 
 Output logs go to `build_logs\build-YYYYMMDD-HHMMSS.log`.
 
+### Release Manifest Script
+
+After publish, generate a hash/size manifest for release uploads:
+
+```powershell
+.\GENERATE_RELEASE_MANIFEST.ps1
+```
+
+By default this writes `release-manifest.txt` inside `bin\Release\net8.0-windows\win-x64\publish`.
+
 ### Batch Script
 
 For CMD users:

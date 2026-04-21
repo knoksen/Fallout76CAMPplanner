@@ -22,181 +22,174 @@ Dette er et viderebygget fundament for et Fallout 76 CAMP-planleggingsverktøy f
   - Ctrl-klikk for å bygge utvalg
   - drag-boks for marquee selection
   - gruppedrag og gruppesletting
-- **Blueprint-moduler**
-  - lagre valgt utvalg som `.blueprint.json`
-  - laste blueprint-filer
-  - lime inn ferdig modul på canvas
-  - lagre og laste blueprint-moduler per aktiv CAMP-slot (Slot1–Slot4)
-- **Automatiske Shelter-restriksjoner** for kategorier som Vendor, Resource, Display og Ally
-- **Approximate analysis overlays**
-  - surface CAMP radius overlay
-  - turret coverage arcs
-  - visitor flow overlay (fra CAMP center til nøkkelmål)
-  - trap zone overlay (defense/trap-markerte områder)
-  - persisted ingress / checkpoint / egress markers for ruteplanlegging
-  - ordered route-path editor with editable marker labels og sekvens
-  - structured trap zones med severity, bounds og egne review-notater
-- **Layer lock** i tillegg til layer hide
-- **Snap toggle**
-  - slå smart snapping av/på i Rules-seksjonen
-  - hurtig-toggle i verktøylinjen
-- **Budget profiles per playstyle**
-  - Builder
-  - Trap CAMP
-  - Vendor CAMP
-  - Utility CAMP
-  - Nuke CAMP
-  - Showcase CAMP
+# FO76 CAMP Planner
 
+> **A Windows desktop tool for planning Fallout 76 C.A.M.P. and Shelter layouts**
 
-## Nytt i UI/UX-versjonen (v5)
+[![Release](https://img.shields.io/github/v/release/knoksen/Fallout76CAMPplanner?label=latest%20release&color=brightgreen)](https://github.com/knoksen/Fallout76CAMPplanner/releases/latest)
+[![Platform](https://img.shields.io/badge/platform-Windows%2010%2F11-blue?logo=windows)](https://github.com/knoksen/Fallout76CAMPplanner/releases/latest)
+[![.NET](https://img.shields.io/badge/.NET-8.0-purple?logo=dotnet)](https://dotnet.microsoft.com/en-us/download/dotnet/8.0)
+[![License: MIT](https://img.shields.io/badge/license-MIT-yellow)](LICENSE)
 
-- **Tab-basert høyreside** i stedet for én lang kontrollkolonne
-  - Overview
-  - Build
-  - Library
-  - Inspect
-- Tydeligere toppheader med prosjektstatus
-- Forbedret mørk UI med sterkere kontrast og bedre hierarki
-- **Søk og lagfilter** i listen over plasserte items
-- Egen visualisering av item-kort i listen med fargeswatch og lock-badge
-- **Live placement preview** på canvas
-- **Hover-koordinater og snarveishint** direkte i canvas-visningen
+Plan your Fallout 76 base before you place a single brick. FO76 CAMP Planner gives you a 2D canvas editor with placement rules, layered overlays, visitor flow analysis, trap zone planning, blueprint modules, and a minimap — all in a single self-contained Windows `.exe` with no install required.
 
-## Analysemodus
+---
 
-Denne versjonen har også et enkelt analyse-lag for planlegging, ikke som en eksakt simulator:
+## Screenshots
 
-- **Approx surface CAMP radius** viser en omtrentlig bygge-/kontrollsone for surface planlegging
-- **Approx turret coverage arcs** viser en omtrentlig forsvarskjegle basert på turret-rotasjon
-- **Layer lock** lar deg fryse hele lag mens du jobber videre på andre systemer
-- **Visitor flow** viser foreslåtte hovedlinjer fra CAMP center til funksjonelle mål som dører, workbench og vendor
-- **Trap zones** viser risiko-/forsvarssoner rundt trap-/defense-elementer
-- **Route planning editor** lar deg:
-  - bygge en rekkefølge av ingress → checkpoints → egress
-  - gi hvert punkt eget navn og justere rekkefølgen direkte i UI
-  - flytte markører direkte på canvas med drag-and-drop
-  - lagre forsvars-/trafikkvurderinger i prosjektfilen
-- **Trap planning editor** lar deg:
-  - opprette soner fra valgt område
-  - flytte soner direkte på canvas
-  - resize soner med hjørnehåndtak på canvas
-  - sette severity (`Low`, `Medium`, `High`, `Critical`)
-  - lagre egne review-notater per sone
+| Overview | Analysis & Blueprints |
+|---|---|
+| ![Planner overview](https://github.com/user-attachments/assets/1975c46b-8103-4659-8106-ab01b5a2f7b2) | ![Analysis and stored blueprints](https://github.com/user-attachments/assets/3939d7e0-28fa-48a2-b49f-15f8dfbf24a5) |
 
-## Viktig om Fallout 76-logikk
+---
 
-Denne versjonen er fortsatt et planleggingsverktøy, ikke en full 1:1 simulering av alle skjulte plasseringstester i Fallout 76.
+## Download
 
-Det bevisste regelsettet er:
+Grab the latest release — a single self-contained `.exe`, no .NET install required:
 
-- **Strict:** ingen overlap utenom foundation-underlag
-- **Relaxed:** overlap tillatt for mykere lag som Power og Decor
-- **Shelter:** mer kreativ stacking, men fortsatt kontrollert
+**[⬇ Download FO76 CAMP Planner (Windows x64)](https://github.com/knoksen/Fallout76CAMPplanner/releases/latest)**
 
-I tillegg er noen kategorier bevisst blokkert i Shelter-modus for å ligge nærmere faktisk bruk:
+---
 
-- Vendor
-- Resource
-- Display
-- Ally
+## Features
 
-## Presets som følger med
+### Canvas & Placement
+- 2D grid canvas with live placement preview and zoom
+- **Snap modes**: Strict, Relaxed, Off — cycle from the toolbar or Rules panel
+- **Multi-select**: Ctrl+click or drag-box selection, group move, rotate, delete
+- **Smart snapping**: walls/doors snap to foundation edges, roofs to foundation fields, stairs to open edges
+- **Layer toggles + layer lock**: Structure, Utility, Defense, Power, Aesthetic, Commerce
+- Full **Undo / Redo** (Ctrl+Z / Ctrl+Y)
+- **Live placement preview** with footer feedback when placement is blocked
 
-- Custom Surface CAMP
-- Vault Lobby Shelter
-- Vault Utility Room
-- Missile Silo Shelter
-- Nuclear Test Bunker
-- The Flatlands Shelter
-- Triumph Terrace
-- Wrangler Casino
-- Nuke Surface CAMP
+### Planning Modes
+- **Surface CAMP** and **Shelter** modes with separate rule enforcement
+- **Rule profiles**: Strict (no overlap), Relaxed (soft layers allowed), Shelter (stacking with guardrails)
+- Shelter mode automatically blocks Vendor, Resource, Display, and Ally categories to reflect actual game constraints
+- Shelter presets enforce caps on turrets, route markers, trap zones, and max trap severity
 
-## Eksempelfiler
+### Analysis Overlays
+- **CAMP radius overlay** — approximate build/control zone for surface planning
+- **Turret coverage arcs** — approximate defense cone per turret rotation
+- **Visitor flow overlay** — main lines from CAMP center to key targets (doors, workbench, vendor)
+  - Ingress markers colored by coverage status
+  - Route segments tinted by trap severity
+- **Trap zone overlay** — risk/defense zones around trap/defense items
+- **Defense analysis summary** — approximate score (0–100), ingress coverage, and weak-angle hints
+- **Scenario compare (A/B)** — save a baseline and diff score, budget, and ingress coverage against it
 
-Prosjekter:
+### Route & Trap Planning
+- Build ordered **ingress → checkpoint → egress** sequences with editable labels
+- Drag markers directly on canvas; reorder in the panel
+- Create and resize **trap zones** on canvas with corner handles
+- Set severity per zone: Low / Medium / High / Critical
+- Add private review notes per zone
+- **Inline cap meter** in the Route/Trap panel shows live bars for Markers, Zones, and Max severity with warn/error coloring when approaching shelter caps
+- Soft-disabled actions with explanatory tooltips when a shelter cap is reached
+
+### Blueprints & Budget
+- Save any multi-select as a reusable `.blueprint.json` module
+- Load and paste blueprint modules onto the canvas
+- Blueprint library per CAMP slot (Slot 1–4)
+- **Budget profiles**: Builder, Trap CAMP, Vendor CAMP, Utility CAMP, Nuke CAMP, Showcase CAMP
+- Budget meter shows placed vs. stored budget with profile-aware targets
+
+### Minimap & Inspector
+- **Minimap** with selected-item highlight, CAMP center crosshair, and hover cell feedback
+- **Contextual inspector** for single-item note, X/Y, and rotation edits
+- Nudge controls for precise single-cell movement
+- Quick-duplicate in toolbar and via directional quick actions (`Dup ←/→/↑/↓`)
+
+### Device Hub
+Quick-launch panel for PC tools, mobile companion workflow, and console shortcuts:
+- Open project/release folders, launch the published EXE, open GitHub/SourceForge/docs links
+- Export a mobile-friendly project summary or snapshot pack (PNG + summary)
+- Generate a QR-ready links file
+- Configurable Xbox / PlayStation / Generic console action buttons
+
+---
+
+## Built-in Presets
+
+| Preset | Type |
+|---|---|
+| Custom Surface CAMP | Surface |
+| Vault Lobby Shelter | Shelter |
+| Vault Utility Room | Shelter |
+| Missile Silo Shelter | Shelter |
+| Nuclear Test Bunker | Shelter |
+| The Flatlands Shelter | Shelter |
+| Triumph Terrace | Shelter |
+| Wrangler Casino | Shelter |
+| Nuke Surface CAMP | Surface |
+
+---
+
+## Quick Start
+
+1. Download the latest release EXE from the [Releases page](https://github.com/knoksen/Fallout76CAMPplanner/releases/latest)
+2. Run `FO76CampPlanner.exe` — no installation needed
+3. Open a sample project: `sample-foundation-layout.json` or `sample-missile-silo-layout.json`
+4. Try Ctrl+click and drag-box selection, then **Save selection as blueprint**
+5. Toggle overlays (visitor flow, trap zones, defense arcs) from the Analysis panel
+
+---
+
+## Keyboard Shortcuts
+
+| Key | Action |
+|---|---|
+| `R` | Rotate selected item / group |
+| `Delete` | Delete selected item / group |
+| `Ctrl+Z` | Undo |
+| `Ctrl+Y` | Redo |
+| `+ / -` | Zoom in / out |
+| Arrow keys | Move selected item / group one cell |
+| `Ctrl+click` | Add / remove from selection |
+
+---
+
+## Building from Source
+
+**Requirements:** .NET 8 SDK on Windows 10/11
+
+```powershell
+# Full release build + publish (single-file EXE)
+.\Knoksen_FO76_CAMP_Planner_Win10\BUILD_AND_PUBLISH_v10.ps1 -Runtime win-x64 -Configuration Release
+```
+
+Or use the build scripts directly:
+
+```powershell
+cd Knoksen_FO76_CAMP_Planner_Win10
+.\build-win10-singlefile.ps1
+```
+
+Published EXE lands at:
+```
+Knoksen_FO76_CAMP_Planner_Win10\bin\Release\net8.0-windows\win-x64\publish\FO76CampPlanner.exe
+```
+
+---
+
+## Sample Files
+
+**Projects:**
 - `sample-foundation-layout.json`
 - `sample-missile-silo-layout.json`
 - `sample-defense-layout.json`
 
-Blueprints:
+**Blueprints:**
 - `sample-blueprints/foundation-ring.blueprint.json`
 - `sample-blueprints/nuke-lane.blueprint.json`
 
-## Tastatursnarveier
+---
 
-- `R` = roter valgt objekt / valgt gruppe
-- `Delete` = slett valgt objekt / valgt gruppe
-- `Ctrl+Z` = undo
-- `Ctrl+Y` = redo
-- `+ / -` = zoom
-- piltaster = flytt valgt objekt / gruppe én celle
-- `Ctrl+klikk` = legg til / fjern fra utvalg
+## Disclaimer
 
-## Bygg på Windows 10 til én .exe
+This is a planning and visualization tool, not a 1:1 simulation of Fallout 76's internal placement engine. Placement rules approximate real game behavior; always verify complex builds in-game.
 
-Forutsetning: .NET 8 SDK installert.
+---
 
-### PowerShell
+*Not affiliated with Bethesda Softworks or ZeniMax Media.*
 
-```powershell
-./build-win10-singlefile.ps1
-```
-
-### CMD
-
-```bat
-build-win10-singlefile.bat
-```
-
-Publisert fil havner normalt i:
-
-```text
-bin\Release\net8.0-windows\win-x64\publish\FO76CampPlanner.exe
-```
-
-## Viktig om `.exe`
-
-Prosjektet er satt opp for single-file Windows-publisering, men selve `.exe` må bygges på en Windows-maskin med .NET SDK.
-
-## Anbefalt neste steg
-
-1. Hurtigduplisering av valgt modul
-2. Visitor flow / ingress-egress-linjer
-3. Trap logic-zoner og lure-path overlays
-4. Print-ready legend og prosjektkort
-5. Blueprint-bibliotek per prosjekt og per CAMP-slot
-6. Shelter-spesifikke templates med ferdige romsekvenser
-7. Mini-map / oversiktskart
-8. Print-/share-ready prosjektpresentasjon
-
-## Start raskt
-
-1. Åpne `sample-foundation-layout.json` eller `sample-missile-silo-layout.json`
-2. Test `Ctrl+klikk` og drag-boks i Select-modus
-3. Marker et lite oppsett og bruk **Save selection as blueprint**
-4. Last blueprint igjen og bruk **Paste loaded blueprint**
-
-## v1.1/v1.2 progression (in progress)
-
-- Quick-duplicate zones er nå tilgjengelig i både toolbar og quick actions (`Dup ←/→/↑/↓`)
-- Blueprint library per CAMP-slot er funksjonell for in-memory moduler i prosjektet
-- Snap toggle finnes både i Rules-seksjonen og som toolbar-knapp
-- Visitor flow og trap zones har egne analyse-overlays med toggles
-- Visitor flow kan nå planlegges med egne ingress-, checkpoint- og egress-markører som lagres i prosjektet
-- Trap zone tagging finnes i Inspector quick actions
-- Overlay review presets gjør det raskere å bytte mellom visitor flow-, trap- og defense-gjennomganger
-- Budget profiles per playstyle er koblet direkte til budsjettstyring i UI
-
-
-## v7 UI/UX and workflow improvements
-
-This round focuses on making the planner feel more like a real design workstation:
-
-- minimap overview with selected-item highlighting, CAMP center marker and hover cell feedback
-- dynamic quick-start guidance that recommends the next best workflow step
-- contextual inspector for single-item note, X/Y and rotation edits
-- explicit duplicate / delete actions in the toolbar and inspector
-- fast set-CAMP-center action from current selection
-- stronger workflow support for layout → envelope → systems → defense → polish
