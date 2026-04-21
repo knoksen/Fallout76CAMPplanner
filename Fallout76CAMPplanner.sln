@@ -1,10 +1,14 @@
-Microsoft Visual Studio Solution File, Format Version 12.00
+﻿Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.5.2.0
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Knoksen_FO76_CAMP_Planner_Win10", "Knoksen_FO76_CAMP_Planner_Win10", "{323CE239-7DF3-FB9B-82AC-5BD202855334}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FO76CampPlanner", "Knoksen_FO76_CAMP_Planner_Win10\FO76CampPlanner.csproj", "{0B15D020-AB9C-DB8F-4B2B-92A1B5260755}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{08FA611F-7D8A-495E-891C-03D7E53DCA9A}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FO76CampPlanner.Tests", "tests\FO76CampPlanner.Tests\FO76CampPlanner.Tests.csproj", "{27221254-B076-4280-8BF2-E577E46F7248}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -16,12 +20,17 @@ Global
 		{0B15D020-AB9C-DB8F-4B2B-92A1B5260755}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{0B15D020-AB9C-DB8F-4B2B-92A1B5260755}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{0B15D020-AB9C-DB8F-4B2B-92A1B5260755}.Release|Any CPU.Build.0 = Release|Any CPU
+		{27221254-B076-4280-8BF2-E577E46F7248}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{27221254-B076-4280-8BF2-E577E46F7248}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{27221254-B076-4280-8BF2-E577E46F7248}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{27221254-B076-4280-8BF2-E577E46F7248}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
 	EndGlobalSection
 	GlobalSection(NestedProjects) = preSolution
 		{0B15D020-AB9C-DB8F-4B2B-92A1B5260755} = {323CE239-7DF3-FB9B-82AC-5BD202855334}
+		{27221254-B076-4280-8BF2-E577E46F7248} = {08FA611F-7D8A-495E-891C-03D7E53DCA9A}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {01410FB9-879E-48FA-BBF2-FD1A6CDE52FE}
