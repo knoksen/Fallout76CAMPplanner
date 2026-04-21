@@ -5,6 +5,11 @@ namespace FO76CampPlanner;
 
 public sealed class MainForm : Form
 {
+    private readonly IProjectService _projectService;
+    private readonly IBlueprintService _blueprintService;
+    private System.Threading.Timer? _autosaveTimer;
+    private readonly System.Threading.SemaphoreSlim _autosaveLock = new(1, 1);
+    private static readonly System.TimeSpan AutosaveInterval = System.TimeSpan.FromMinutes(2);
     private readonly PlannerCanvas _canvas = new();
     private readonly ListBox _itemList = new();
     private readonly Label _selectionLabel = new();
@@ -135,8 +140,10 @@ public sealed class MainForm : Form
         int DefendedIngressCount,
         int DefenseScore);
 
-    public MainForm()
+    public MainForm(IProjectService projectService, IBlueprintService blueprintService)
     {
+        _projectService = projectService ?? throw new ArgumentNullException(nameof(projectService));
+        _blueprintService = blueprintService ?? throw new ArgumentNullException(nameof(blueprintService));
         Text = "FO76 CAMP Planner";
         MinimumSize = new Size(1420, 920);
         Width = 1680;
@@ -150,6 +157,132 @@ public sealed class MainForm : Form
         WireEvents();
         ApplyTheme(this);
         NewProject();
+        StartAutosaveTimer();
+    }
+
+    private void StartAutosaveTimer()
+    {
+        _autosaveTimer?.Dispose();
+        _autosaveTimer = new System.Threading.Timer(async _ => await DoAutosaveAsync().ConfigureAwait(false), null, AutosaveInterval, AutosaveInterval);
+    }
+
+    private async System.Threading.Tasks.Task DoAutosaveAsync()
+    {
+        // Avoid concurrent autosaves
+        if (_autosaveLock.CurrentCount == 0)
+        {
+            return;
+        }
+
+        await _autosaveLock.WaitAsync().ConfigureAwait(false);
+        try
+        {
+            var project = _canvas.Project;
+            if (project is null)
+            {
+                return;
+            }
+
+            var projectPath = _currentPath ?? System.IO.Path.Combine(System.IO.Path.GetTempPath(), "FO76CampPlanner", "unsaved.json");
+            var autosavePath = await _projectService.GetAutosavePathAsync(projectPath).ConfigureAwait(false);
+            try
+            {
+                await _projectService.AutosaveAsync(project, autosavePath).ConfigureAwait(false);
+                if (IsHandleCreated)
+                {
+                    try
+                    {
+                        Invoke(() => _statusLabel.Text = $"Autosaved {System.IO.Path.GetFileName(autosavePath)} at {System.DateTime.Now:T}.");
+                    }
+                    catch { }
+                }
+            }
+            catch
+            {
+                // Intentionally ignore autosave failures to avoid disrupting the user.
+            }
+        }
+        finally
+        {
+            _autosaveLock.Release();
+        }
+    }
+
+    protected override void Dispose(bool disposing)
+    {
+        if (disposing)
+        {
+            _autosaveTimer?.Dispose();
+            _autosaveLock?.Dispose();
+        }
+
+        base.Dispose(disposing);
+    }
+
+    protected override void OnShown(EventArgs e)
+    {
+        base.OnShown(e);
+        _ = CheckForRecoveryAsync();
+    }
+
+    private async System.Threading.Tasks.Task CheckForRecoveryAsync()
+    {
+        try
+        {
+            var projectPath = _currentPath ?? System.IO.Path.Combine(System.IO.Path.GetTempPath(), "FO76CampPlanner", "unsaved.json");
+            var autosavePath = await _projectService.GetAutosavePathAsync(projectPath).ConfigureAwait(false);
+            if (!System.IO.File.Exists(autosavePath))
+            {
+                return;
+            }
+
+            // Ask user on UI thread
+            if (IsHandleCreated)
+            {
+                var result = DialogResult.None;
+                try
+                {
+                    Invoke(() =>
+                    {
+                        result = MessageBox.Show(this,
+                            "An autosave was found. Do you want to recover it?",
+                            "Recover Autosave",
+                            MessageBoxButtons.YesNo,
+                            MessageBoxIcon.Question);
+                    });
+                }
+                catch
+                {
+                    return;
+                }
+
+                if (result == DialogResult.Yes)
+                {
+                    try
+                    {
+                        var project = await _projectService.LoadAsync(autosavePath).ConfigureAwait(false);
+                        NormalizeProject(project);
+                        _canvas.Project = project;
+                        _currentPath = null;
+                        _isDirty = true;
+                        Invoke(() =>
+                        {
+                            RefreshProjectUi();
+                            _statusLabel.Text = $"Recovered autosave: {System.IO.Path.GetFileName(autosavePath)}";
+                        });
+                    }
+                    catch (Exception ex)
+                    {
+                        Invoke(() => MessageBox.Show(this, ex.Message, "Recover failed", MessageBoxButtons.OK, MessageBoxIcon.Error));
+                    }
+                }
+                else
+                {
+                    try { System.IO.File.Delete(autosavePath); } catch { }
+                }
+            }
+        }
+        catch { }
     }
 
     private void BuildUi()
@@ -3706,7 +3839,7 @@ public sealed class MainForm : Form
 
         try
         {
-            _canvas.LoadBlueprint(dialog.FileName);
+            _ = LoadBlueprintAsync(dialog.FileName);
         }
         catch (Exception ex)
         {
@@ -3714,7 +3847,31 @@ public sealed class MainForm : Form
         }
     }
 
-    private void OpenProject()
+    private async System.Threading.Tasks.Task LoadBlueprintAsync(string path)
+    {
+        try
+        {
+            var module = await _blueprintService.LoadAsync(path).ConfigureAwait(false);
+            // Apply to canvas on UI thread
+            if (InvokeRequired)
+            {
+                Invoke(() => _canvas.LoadBlueprintModule(module, Path.GetFileName(path)));
+            }
+            else
+            {
+                _canvas.LoadBlueprintModule(module, Path.GetFileName(path));
+            }
+        }
+        catch (Exception ex)
+        {
+            if (IsHandleCreated)
+            {
+                try { Invoke(() => MessageBox.Show(this, ex.Message, "Blueprint load failed", MessageBoxButtons.OK, MessageBoxIcon.Error)); } catch { }
+            }
+        }
+    }
+
+    private async void OpenProject()
     {
         using var dialog = new OpenFileDialog
         {
@@ -3729,20 +3886,26 @@ public sealed class MainForm : Form
 
         try
         {
-            var json = File.ReadAllText(dialog.FileName);
-            var project = JsonSerializer.Deserialize<PlannerProject>(json, AppJson.Default);
-            if (project is null)
-            {
-                throw new InvalidOperationException("Could not deserialize project file.");
-            }
-
+            var project = await _projectService.LoadAsync(dialog.FileName).ConfigureAwait(false);
             NormalizeProject(project);
             _currentPath = dialog.FileName;
             _isDirty = false;
             _scenarioBaseline = null;
             _canvas.Project = project;
-            RefreshProjectUi();
-            _statusLabel.Text = $"Opened {Path.GetFileName(dialog.FileName)}.";
+            // Marshal back to UI thread for UI updates
+            if (InvokeRequired)
+            {
+                Invoke(() =>
+                {
+                    RefreshProjectUi();
+                    _statusLabel.Text = $"Opened {Path.GetFileName(dialog.FileName)}.";
+                });
+            }
+            else
+            {
+                RefreshProjectUi();
+                _statusLabel.Text = $"Opened {Path.GetFileName(dialog.FileName)}.";
+            }
         }
         catch (Exception ex)
         {
@@ -3750,7 +3913,7 @@ public sealed class MainForm : Form
         }
     }
 
-    private void SaveProject(bool forceChoosePath)
+    private async void SaveProject(bool forceChoosePath)
     {
         var path = _currentPath;
         if (forceChoosePath || string.IsNullOrWhiteSpace(path))
@@ -3773,10 +3936,16 @@ public sealed class MainForm : Form
 
         try
         {
-            var json = JsonSerializer.Serialize(_canvas.Project, AppJson.Default);
-            File.WriteAllText(path!, json);
+            await _projectService.SaveAsync(_canvas.Project, path!).ConfigureAwait(false);
             _isDirty = false;
-            _statusLabel.Text = $"Saved {Path.GetFileName(path)}.";
+            if (InvokeRequired)
+            {
+                Invoke(() => _statusLabel.Text = $"Saved {Path.GetFileName(path)}.");
+            }
+            else
+            {
+                _statusLabel.Text = $"Saved {Path.GetFileName(path)}.";
+            }
         }
         catch (Exception ex)
         {
@@ -3784,7 +3953,7 @@ public sealed class MainForm : Form
         }
     }
 
-    private void ExportPng()
+    private async void ExportPng()
     {
         using var dialog = new SaveFileDialog
         {
@@ -3800,9 +3969,45 @@ public sealed class MainForm : Form
 
         try
         {
-            using var bitmap = _canvas.RenderToBitmap();
-            bitmap.Save(dialog.FileName);
-            _statusLabel.Text = $"Exported {Path.GetFileName(dialog.FileName)}.";
+            Bitmap? bitmap = null;
+            try
+            {
+                // Render on UI thread (quick operation)
+                if (InvokeRequired)
+                {
+                    Invoke(() => bitmap = _canvas.RenderToBitmap());
+                }
+                else
+                {
+                    bitmap = _canvas.RenderToBitmap();
+                }
+
+                if (bitmap is null)
+                {
+                    throw new InvalidOperationException("Failed to render canvas.");
+                }
+
+                var targetPath = dialog.FileName;
+                // Save on background thread to avoid blocking UI
+                await System.Threading.Tasks.Task.Run(() =>
+                {
+                    using var cloned = new Bitmap(bitmap);
+                    cloned.Save(targetPath);
+                }).ConfigureAwait(false);
+
+                if (InvokeRequired)
+                {
+                    Invoke(() => _statusLabel.Text = $"Exported {Path.GetFileName(targetPath)}.");
+                }
+                else
+                {
+                    _statusLabel.Text = $"Exported {Path.GetFileName(targetPath)}.";
+                }
+            }
+            finally
+            {
+                bitmap?.Dispose();
+            }
         }
         catch (Exception ex)
         {
