@@ -23,14 +23,13 @@ dotnet test tests/FO76CampPlanner.Tests/FO76CampPlanner.Tests.csproj -c Release
 
 Run Codacy analysis (if you have Codacy CLI / MCP tools)
 1. Ensure Codacy CLI is installed and configured for this repository.
-2. Run the analyze command for each edited file. Example (adjust paths):
+2. Run the helper script which invokes `codacy_cli_analyze` for the common edited files:
 
-```bash
-codacy_cli_analyze --rootPath "$(pwd)" --file "Knoksen_FO76_CAMP_Planner_Win10/Services/ProjectService.cs"
-codacy_cli_analyze --rootPath "$(pwd)" --file "Knoksen_FO76_CAMP_Planner_Win10/MainForm.cs"
+```powershell
+.\tools\run_codacy_analysis.ps1 -RootPath "$(pwd)"
 ```
 
-If Codacy CLI is not available in your environment, run the static checks and formatter you prefer locally and let CI run the full checks.
+If `codacy_cli_analyze` is not available in your environment, the helper will prompt you. You can either install Codacy locally or run equivalent static checks and let CI run the full checks.
 
 Preparing a PR (recommended)
 ```bash
