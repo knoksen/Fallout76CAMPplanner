@@ -40,6 +40,29 @@ jobs:
       - name: Test
         run: dotnet test tests/FO76CampPlanner.Tests/FO76CampPlanner.Tests.csproj -c Release --no-build
 
+  mobile-audit:
+    name: Mobile npm audit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: mobile/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+        working-directory: mobile
+
+      - name: Security audit
+        # --audit-level=moderate fails the job on moderate-or-higher vulnerabilities
+        run: npm audit --audit-level=moderate
+        working-directory: mobile
+
   codacy:
     name: Codacy Analysis
     runs-on: ubuntu-latest

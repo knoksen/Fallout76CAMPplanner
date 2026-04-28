@@ -1,0 +1,30 @@
+version: 2
+updates:
+  # Mobile Expo / React Native (npm)
+  - package-ecosystem: "npm"
+    directory: "/mobile"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "mobile"
+
+  # .NET / NuGet
+  - package-ecosystem: "nuget"
+    directory: "/Knoksen_FO76_CAMP_Planner_Win10"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    labels:
+      - "dependencies"
+      - "dotnet"
+
+  # GitHub Actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+    labels:
+      - "dependencies"
+      - "ci"
