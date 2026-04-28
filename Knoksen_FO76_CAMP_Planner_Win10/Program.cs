@@ -1,5 +1,7 @@
 namespace FO76CampPlanner;
 
+using Microsoft.Extensions.DependencyInjection;
+
 internal static class Program
 {
     [STAThread]
@@ -8,7 +10,15 @@ internal static class Program
         try
         {
             ApplicationConfiguration.Initialize();
-            Application.Run(new MainForm());
+
+            var services = new ServiceCollection();
+            services.AddSingleton<IProjectService, ProjectService>();
+            services.AddSingleton<IBlueprintService, BlueprintService>();
+            services.AddSingleton<MainForm>();
+
+            using var provider = services.BuildServiceProvider();
+            var mainForm = provider.GetRequiredService<MainForm>();
+            Application.Run(mainForm);
         }
         catch (Exception ex)
         {
