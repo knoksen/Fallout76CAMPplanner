@@ -785,3 +785,37 @@ public static class PresetLibrary
     public static ProjectPreset GetById(string? presetId)
         => All.FirstOrDefault(x => string.Equals(x.Id, presetId, StringComparison.OrdinalIgnoreCase)) ?? All[0];
 }
+
+// ---------------------------------------------------------------------------
+// Portable cross-platform plan format (shared with the mobile companion app)
+// ---------------------------------------------------------------------------
+
+/// <summary>
+/// A lightweight plan representation shared between the desktop and mobile apps.
+/// The mobile app exports this via Share; the desktop imports it via File Open.
+/// </summary>
+public sealed class MobilePortablePlan
+{
+    public string SchemaVersion { get; set; } = "1";
+    public string SchemaType { get; set; } = "fo76camp-portable-plan";
+    public string Name { get; set; } = "Imported Plan";
+    public int Budget { get; set; } = 1000;
+    public string ExportedAt { get; set; } = string.Empty;
+    public string Source { get; set; } = "mobile";
+    public List<MobilePortableItem> Items { get; set; } = new();
+
+    public bool IsValid()
+        => SchemaType == "fo76camp-portable-plan"
+           && SchemaVersion == "1"
+           && Items is not null;
+}
+
+public sealed class MobilePortableItem
+{
+    public string Id { get; set; } = string.Empty;
+    public string Name { get; set; } = string.Empty;
+    public string Category { get; set; } = string.Empty;
+    public int Cost { get; set; }
+    public int Quantity { get; set; } = 1;
+    public string? Notes { get; set; }
+}

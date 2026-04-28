@@ -1,10 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import {
   View, Text, TextInput, TouchableOpacity, FlatList,
-  StyleSheet, Alert, ActivityIndicator,
+  StyleSheet, Alert, ActivityIndicator, Share,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { CAMPItem, SavedPlan } from '../data/types';
+import { CAMPItem, SavedPlan, toPortablePlan, fromPortablePlan, PortablePlan } from '../data/types';
 import { Theme } from '../hooks/useTheme';
 
 interface LoadSavePanelProps {
@@ -79,14 +79,58 @@ export default function LoadSavePanel({ items, budget, onLoad, onClose, theme }:
     ]);
   };
 
+  /** Share a plan as portable JSON so the desktop app (or another device) can import it. */
+  const sharePlan = async (plan: SavedPlan) => {
+    try {
+      const portable = toPortablePlan(plan);
+      await Share.share({
+        title: `FO76 CAMP Plan – ${plan.name}`,
+        message: JSON.stringify(portable, null, 2),
+      });
+    } catch {
+      Alert.alert('Error', 'Could not share plan.');
+    }
+  };
+
+  /** Paste a portable JSON string (from clipboard or another source) and save it as a plan. */
+  const importPortable = () => {
+    Alert.prompt(
+      'Import portable plan',
+      'Paste the portable JSON exported from the desktop CAMP Planner or another device:',
+      async (text) => {
+        if (!text?.trim()) return;
+        try {
+          const portable = JSON.parse(text.trim()) as PortablePlan;
+          if (portable.schemaType !== 'fo76camp-portable-plan') {
+            Alert.alert('Invalid format', 'This does not look like a FO76 CAMP portable plan.');
+            return;
+          }
+          const imported = fromPortablePlan(portable);
+          const updated = [...plans, imported];
+          await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+          setPlans(updated);
+          Alert.alert('Imported', `"${imported.name}" has been added to your plans.`);
+        } catch {
+          Alert.alert('Error', 'Could not parse the JSON. Make sure you copied the full export.');
+        }
+      },
+      'plain-text',
+    );
+  };
+
   return (
     <View style={[styles.overlay, { backgroundColor: 'rgba(0,0,0,0.6)' }]}>
       <View style={[styles.panel, { backgroundColor: theme.surface }]}>
         <View style={styles.header}>
           <Text style={[styles.title, { color: theme.text }]}>Load / Save</Text>
-          <TouchableOpacity onPress={onClose} hitSlop={8}>
-            <Text style={[styles.closeBtn, { color: theme.accent }]}>✕</Text>
-          </TouchableOpacity>
+          <View style={styles.headerRight}>
+            <TouchableOpacity onPress={importPortable} style={[styles.importBtn, { borderColor: theme.accent }]} hitSlop={8}>
+              <Text style={[styles.importBtnText, { color: theme.accent }]}>↓ Import</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={onClose} hitSlop={8}>
+              <Text style={[styles.closeBtn, { color: theme.accent }]}>✕</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         <View style={styles.saveRow}>
@@ -123,6 +167,12 @@ export default function LoadSavePanel({ items, budget, onLoad, onClose, theme }:
                   <Text style={[styles.actionBtnText, { color: theme.accent }]}>Load</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
+                  onPress={() => sharePlan(plan)}
+                  style={[styles.actionBtn, { borderColor: theme.accent }]}
+                >
+                  <Text style={[styles.actionBtnText, { color: theme.accent }]}>Share</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
                   onPress={() => deletePlan(plan.id)}
                   style={[styles.actionBtn, { borderColor: theme.error }]}
                 >
@@ -144,8 +194,11 @@ const styles = StyleSheet.create({
   overlay: { ...StyleSheet.absoluteFillObject, justifyContent: 'center', alignItems: 'center', zIndex: 100 },
   panel: { width: '92%', maxHeight: '80%', borderRadius: 14, padding: 18 },
   header: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 },
+  headerRight: { flexDirection: 'row', alignItems: 'center', gap: 12 },
   title: { fontSize: 19, fontWeight: '700' },
   closeBtn: { fontSize: 22, fontWeight: '700' },
+  importBtn: { borderWidth: 1, borderRadius: 6, paddingHorizontal: 10, paddingVertical: 4 },
+  importBtnText: { fontSize: 12, fontWeight: '600' },
   saveRow: { flexDirection: 'row', gap: 8, marginBottom: 12 },
   nameInput: { flex: 1, padding: 9, borderRadius: 8, borderWidth: 1, fontSize: 13 },
   saveBtn: { paddingHorizontal: 16, paddingVertical: 9, borderRadius: 8, justifyContent: 'center' },
