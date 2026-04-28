@@ -24,7 +24,8 @@ public class BlueprintServiceTests
             }
         };
 
-        var json = JsonSerializer.Serialize(module, AppJson.Default);
+        var opts = new JsonSerializerOptions(JsonSerializerDefaults.Web) { PropertyNamingPolicy = JsonNamingPolicy.CamelCase };
+        var json = JsonSerializer.Serialize(module, opts);
         await File.WriteAllTextAsync(path, json);
 
         var loaded = await service.LoadAsync(path);

@@ -79,6 +79,8 @@ public sealed class MainForm : Form
     private readonly Dictionary<string, Button> _workflowButtons = new();
     private readonly ToolTip _routeActionToolTip = new();
     private readonly ToolTip _deviceHubToolTip = new();
+    private CheckBox? _autosaveEnabledCheck;
+    private NumericUpDown? _autosaveIntervalInput;
     private Button? _addIngressButton;
     private Button? _addCheckpointButton;
     private Button? _addEgressButton;
@@ -163,7 +165,16 @@ public sealed class MainForm : Form
     private void StartAutosaveTimer()
     {
         _autosaveTimer?.Dispose();
-        _autosaveTimer = new System.Threading.Timer(async _ => await DoAutosaveAsync().ConfigureAwait(false), null, AutosaveInterval, AutosaveInterval);
+        var project = _canvas.Project;
+        if (project is null || !project.AutosaveEnabled)
+        {
+            _autosaveTimer = null;
+            return;
+        }
+
+        var minutes = Math.Max(1, project.AutosaveIntervalMinutes);
+        var interval = System.TimeSpan.FromMinutes(minutes);
+        _autosaveTimer = new System.Threading.Timer(async _ => await DoAutosaveAsync().ConfigureAwait(false), null, interval, interval);
     }
 
     private async System.Threading.Tasks.Task DoAutosaveAsync()
@@ -178,7 +189,7 @@ public sealed class MainForm : Form
         try
         {
             var project = _canvas.Project;
-            if (project is null)
+            if (project is null || !project.AutosaveEnabled)
             {
                 return;
             }
@@ -594,6 +605,7 @@ public sealed class MainForm : Form
         layout.Controls.Add(MakeSection("Selection", BuildSelectionSection()), 0, 0);
         layout.Controls.Add(MakeSection("Inspector", BuildInspectorSection()), 0, 1);
         layout.Controls.Add(MakeSection("Quick Actions", BuildInspectorActionsSection()), 0, 2);
+        layout.Controls.Add(MakeSection("Autosave", BuildAutosaveSection()), 0, 3);
         return layout;
     }
 
@@ -1550,6 +1562,41 @@ public sealed class MainForm : Form
         return flow;
     }
 
+    private Control BuildAutosaveSection()
+    {
+        var flow = BuildVerticalFlow();
+
+        _autosaveEnabledCheck = BuildCheck("Enable autosave", true, (_, _) =>
+        {
+            if (_suppressUiEvents) return;
+            _canvas.Project.AutosaveEnabled = _autosaveEnabledCheck?.Checked ?? true;
+            StartAutosaveTimer();
+        });
+
+        _autosaveIntervalInput = new NumericUpDown
+        {
+            Minimum = 1,
+            Maximum = 60 * 24,
+            Width = 100,
+            Value = 2
+        };
+        _autosaveIntervalInput.ValueChanged += (_, _) =>
+        {
+            if (_suppressUiEvents) return;
+            _canvas.Project.AutosaveIntervalMinutes = (int)_autosaveIntervalInput.Value;
+            StartAutosaveTimer();
+        };
+
+        var row = new FlowLayoutPanel { AutoSize = true, FlowDirection = FlowDirection.LeftToRight, BackColor = Color.Transparent };
+        row.Controls.Add(_autosaveIntervalInput);
+        row.Controls.Add(MakeLabel("minutes"));
+
+        flow.Controls.Add(_autosaveEnabledCheck);
+        flow.Controls.Add(BuildInfoPill(new Label { Text = "Autosave drafts to a local autosave file every N minutes.", AutoSize = true, ForeColor = TextSecondary }));
+        flow.Controls.Add(row);
+        return flow;
+    }
+
     private Control BuildBlueprintSection()
     {
         var flow = BuildVerticalFlow();
@@ -2151,6 +2198,16 @@ public sealed class MainForm : Form
             RefreshAnalysisUi();
             RefreshMinimapUi();
             RefreshDeviceHubUi();
+            // Autosave UI
+            if (_autosaveEnabledCheck is not null)
+            {
+                _autosaveEnabledCheck.Checked = project.AutosaveEnabled;
+            }
+
+            if (_autosaveIntervalInput is not null)
+            {
+                _autosaveIntervalInput.Value = ClampDecimal(project.AutosaveIntervalMinutes, _autosaveIntervalInput.Minimum, _autosaveIntervalInput.Maximum);
+            }
             UpdateWindowTitle();
         }
         finally

@@ -353,6 +353,9 @@ public sealed class PlannerProject
     public int GridWidth { get; set; } = 40;
     public int GridHeight { get; set; } = 30;
     public int CellSize { get; set; } = 48;
+    public bool AutosaveEnabled { get; set; } = true;
+    public int AutosaveIntervalMinutes { get; set; } = 2;
+    public string? AutosavePath { get; set; }
     public LayerVisibilitySettings LayerVisibility { get; set; } = new();
     public LayerLockSettings LayerLocks { get; set; } = new();
     public bool ShowCampRadiusOverlay { get; set; } = true;
