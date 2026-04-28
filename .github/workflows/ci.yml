@@ -39,3 +39,19 @@ jobs:
 
       - name: Test
         run: dotnet test tests/FO76CampPlanner.Tests/FO76CampPlanner.Tests.csproj -c Release --no-build
+
+  codacy:
+    name: Codacy Analysis
+    runs-on: ubuntu-latest
+    # Only run on PRs targeting main/master; skip forks where the secret is unavailable
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run Codacy Analysis CLI
+        uses: codacy/codacy-analysis-cli-action@v4
+        with:
+          project-token: ${{ secrets.CODACY_PROJECT_TOKEN }}
+          upload: true
+          max-allowed-issues: 2147483647   # report findings but never fail the build
