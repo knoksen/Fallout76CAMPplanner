@@ -112,9 +112,9 @@ public sealed class MainForm : Form
     private CheckBox? _showTurretCoverageCheck;
     private CheckBox? _showVisitorFlowCheck;
     private CheckBox? _showTrapZonesCheck;
-    private string? _currentPath;
-    private bool _suppressUiEvents;
-    private bool _isDirty;
+    private string? _currentProjectFilePath;
+    private bool _isSuppressingUiEvents;
+    private bool _hasUnsavedChanges;
     private ScenarioSnapshot? _scenarioBaseline;
 
     private static readonly Color BgApp = Color.FromArgb(18, 22, 28);
@@ -194,7 +194,7 @@ public sealed class MainForm : Form
                 return;
             }
 
-            var projectPath = _currentPath ?? System.IO.Path.Combine(System.IO.Path.GetTempPath(), "FO76CampPlanner", "unsaved.json");
+            var projectPath = _currentProjectFilePath ?? System.IO.Path.Combine(System.IO.Path.GetTempPath(), "FO76CampPlanner", "unsaved.json");
             var autosavePath = await _projectService.GetAutosavePathAsync(projectPath).ConfigureAwait(false);
             try
             {
@@ -240,7 +240,7 @@ public sealed class MainForm : Form
     {
         try
         {
-            var projectPath = _currentPath ?? System.IO.Path.Combine(System.IO.Path.GetTempPath(), "FO76CampPlanner", "unsaved.json");
+            var projectPath = _currentProjectFilePath ?? System.IO.Path.Combine(System.IO.Path.GetTempPath(), "FO76CampPlanner", "unsaved.json");
             var autosavePath = await _projectService.GetAutosavePathAsync(projectPath).ConfigureAwait(false);
             if (!System.IO.File.Exists(autosavePath))
             {
@@ -272,10 +272,10 @@ public sealed class MainForm : Form
                     try
                     {
                         var project = await _projectService.LoadAsync(autosavePath).ConfigureAwait(false);
-                        NormalizeProject(project);
+                        EnsureProjectDefaults(project);
                         _canvas.Project = project;
-                        _currentPath = null;
-                        _isDirty = true;
+                        _currentProjectFilePath = null;
+                        _hasUnsavedChanges = true;
                         Invoke(() =>
                         {
                             RefreshProjectUi();
@@ -1061,7 +1061,7 @@ public sealed class MainForm : Form
         _snapModeCombo.DataSource = Enum.GetValues<SnapMode>();
         _snapModeCombo.SelectedIndexChanged += (_, _) =>
         {
-            if (_suppressUiEvents) return;
+            if (_isSuppressingUiEvents) return;
             if (_snapModeCombo.SelectedItem is SnapMode snapMode)
             {
                 _canvas.Project.SnapMode = snapMode;
@@ -1151,7 +1151,7 @@ public sealed class MainForm : Form
         var flow = BuildVerticalFlow();
         _showCampRadiusCheck = BuildCheck("Show CAMP radius overlay", true, (_, _) =>
         {
-            if (_suppressUiEvents) return;
+            if (_isSuppressingUiEvents) return;
             _canvas.Project.ShowCampRadiusOverlay = _showCampRadiusCheck?.Checked ?? true;
             _canvas.Invalidate();
             RefreshProjectUi();
@@ -1159,7 +1159,7 @@ public sealed class MainForm : Form
 
         _showTurretCoverageCheck = BuildCheck("Show turret coverage", true, (_, _) =>
         {
-            if (_suppressUiEvents) return;
+            if (_isSuppressingUiEvents) return;
             _canvas.Project.ShowTurretCoverage = _showTurretCoverageCheck?.Checked ?? true;
             _canvas.Invalidate();
             RefreshProjectUi();
@@ -1167,7 +1167,7 @@ public sealed class MainForm : Form
 
         _showVisitorFlowCheck = BuildCheck("Show visitor flow", true, (_, _) =>
         {
-            if (_suppressUiEvents) return;
+            if (_isSuppressingUiEvents) return;
             _canvas.Project.ShowVisitorFlowOverlay = _showVisitorFlowCheck?.Checked ?? true;
             _canvas.Invalidate();
             RefreshProjectUi();
@@ -1175,7 +1175,7 @@ public sealed class MainForm : Form
 
         _showTrapZonesCheck = BuildCheck("Show trap zones", true, (_, _) =>
         {
-            if (_suppressUiEvents) return;
+            if (_isSuppressingUiEvents) return;
             _canvas.Project.ShowTrapZonesOverlay = _showTrapZonesCheck?.Checked ?? true;
             _canvas.Invalidate();
             RefreshProjectUi();
@@ -1425,7 +1425,7 @@ public sealed class MainForm : Form
             };
             check.CheckedChanged += (_, _) =>
             {
-                if (_suppressUiEvents) return;
+                if (_isSuppressingUiEvents) return;
                 _canvas.SetLayerVisibility(layer, check.Checked);
             };
 
@@ -1440,7 +1440,7 @@ public sealed class MainForm : Form
             };
             lockCheck.CheckedChanged += (_, _) =>
             {
-                if (_suppressUiEvents) return;
+                if (_isSuppressingUiEvents) return;
                 _canvas.SetLayerLocked(layer, lockCheck.Checked);
             };
 
@@ -1621,7 +1621,7 @@ public sealed class MainForm : Form
         _campSlotCombo.DataSource = Enum.GetValues<CampSlot>();
         _campSlotCombo.SelectedIndexChanged += (_, _) =>
         {
-            if (_suppressUiEvents) return;
+            if (_isSuppressingUiEvents) return;
             if (_campSlotCombo.SelectedItem is CampSlot slot)
             {
                 _canvas.Project.ActiveCampSlot = slot;
@@ -1958,7 +1958,7 @@ public sealed class MainForm : Form
         _inspectorNoteText.Leave += (_, _) => ApplyInspectorChanges();
         _inspectorRotationInput.ValueChanged += (_, _) =>
         {
-            if (!_suppressUiEvents && _canvas.SelectedItems.Count == 1)
+            if (!_isSuppressingUiEvents && _canvas.SelectedItems.Count == 1)
             {
                 ApplyInspectorChanges();
             }
@@ -1966,7 +1966,7 @@ public sealed class MainForm : Form
 
         _projectNameText.TextChanged += (_, _) =>
         {
-            if (_suppressUiEvents) return;
+            if (_isSuppressingUiEvents) return;
             _canvas.Project.Name = string.IsNullOrWhiteSpace(_projectNameText.Text) ? "Untitled CAMP" : _projectNameText.Text.Trim();
             _canvas.Invalidate();
             RefreshProjectUi();
@@ -1974,7 +1974,7 @@ public sealed class MainForm : Form
 
         _modeCombo.SelectedIndexChanged += (_, _) =>
         {
-            if (_suppressUiEvents) return;
+            if (_isSuppressingUiEvents) return;
             if (_modeCombo.SelectedItem is BuildMode mode)
             {
                 _canvas.Project.Mode = mode;
@@ -1986,7 +1986,7 @@ public sealed class MainForm : Form
 
         _ruleCombo.SelectedIndexChanged += (_, _) =>
         {
-            if (_suppressUiEvents) return;
+            if (_isSuppressingUiEvents) return;
             if (_ruleCombo.SelectedItem is RuleProfile profile)
             {
                 _canvas.Project.RuleProfile = profile;
@@ -1997,21 +1997,21 @@ public sealed class MainForm : Form
 
         _budgetLimitInput.ValueChanged += (_, _) =>
         {
-            if (_suppressUiEvents) return;
+            if (_isSuppressingUiEvents) return;
             _canvas.Project.BudgetLimit = (int)_budgetLimitInput.Value;
             RefreshProjectUi();
         };
 
         _storedBudgetInput.ValueChanged += (_, _) =>
         {
-            if (_suppressUiEvents) return;
+            if (_isSuppressingUiEvents) return;
             _canvas.Project.StoredBudget = (int)_storedBudgetInput.Value;
             RefreshProjectUi();
         };
 
         _budgetProfileCombo.SelectedIndexChanged += (_, _) =>
         {
-            if (_suppressUiEvents) return;
+            if (_isSuppressingUiEvents) return;
             if (_budgetProfileCombo.SelectedItem is BudgetPlaystyleProfile profile)
             {
                 ApplyBudgetProfile(profile);
@@ -2020,7 +2020,7 @@ public sealed class MainForm : Form
 
         _overlayPresetCombo.SelectedIndexChanged += (_, _) =>
         {
-            if (_suppressUiEvents) return;
+            if (_isSuppressingUiEvents) return;
             if (_overlayPresetCombo.SelectedItem is OverlayReviewPreset preset)
             {
                 ApplyOverlayPreset(preset);
@@ -2029,7 +2029,7 @@ public sealed class MainForm : Form
 
         _gridWidthInput.ValueChanged += (_, _) =>
         {
-            if (_suppressUiEvents) return;
+            if (_isSuppressingUiEvents) return;
             _canvas.Project.GridWidth = (int)_gridWidthInput.Value;
             _canvas.Invalidate();
             RefreshProjectUi();
@@ -2037,7 +2037,7 @@ public sealed class MainForm : Form
 
         _gridHeightInput.ValueChanged += (_, _) =>
         {
-            if (_suppressUiEvents) return;
+            if (_isSuppressingUiEvents) return;
             _canvas.Project.GridHeight = (int)_gridHeightInput.Value;
             _canvas.Invalidate();
             RefreshProjectUi();
@@ -2045,7 +2045,7 @@ public sealed class MainForm : Form
 
         _zoomInput.ValueChanged += (_, _) =>
         {
-            if (_suppressUiEvents) return;
+            if (_isSuppressingUiEvents) return;
             _canvas.ZoomPercent = (int)_zoomInput.Value;
         };
 
@@ -2055,7 +2055,7 @@ public sealed class MainForm : Form
 
         _itemList.SelectedIndexChanged += (_, _) =>
         {
-            if (_suppressUiEvents) return;
+            if (_isSuppressingUiEvents) return;
             var ids = _itemList.SelectedItems.OfType<ItemListEntry>().Select(x => x.Item.Id).ToList();
             _canvas.SelectItems(ids);
             if (ids.Count > 0)
@@ -2080,10 +2080,9 @@ public sealed class MainForm : Form
 
     private void NewProject()
     {
-        _currentPath = null;
-        _isDirty = false;
-        _scenarioBaseline = null;
-        _canvas.Project = PresetLibrary.GetById("custom").CreateProject();
+        _currentProjectFilePath = null;
+        _hasUnsavedChanges = false;
+
         _canvas.Project.Name = "Knoksen Foundation Draft";
         SetActiveTool(ToolType.Foundation);
         _zoomInput.Value = 100;
@@ -2101,10 +2100,9 @@ public sealed class MainForm : Form
             return;
         }
 
-        _currentPath = null;
-        _isDirty = false;
-        _scenarioBaseline = null;
-        _canvas.Project = preset.CreateProject();
+        _currentProjectFilePath = null;
+        _hasUnsavedChanges = false;
+
         SetActiveTool(ToolType.Foundation);
         RefreshProjectUi();
         RefreshBlueprintUi();
@@ -2114,10 +2112,10 @@ public sealed class MainForm : Form
 
     private void RefreshProjectUi()
     {
-        _suppressUiEvents = true;
+        _isSuppressingUiEvents = true;
         try
         {
-            var project = NormalizeProject(_canvas.Project);
+            var project = EnsureProjectDefaults(_canvas.Project);
 
             if (_projectNameText.Text != project.Name)
             {
@@ -2212,7 +2210,7 @@ public sealed class MainForm : Form
         }
         finally
         {
-            _suppressUiEvents = false;
+            _isSuppressingUiEvents = false;
         }
     }
 
@@ -2229,8 +2227,8 @@ public sealed class MainForm : Form
             filtered = filtered.Where(item =>
             {
                 Catalog.ById.TryGetValue(item.DefinitionId, out var def);
-                var hay = $"{def?.Name} {item.Note} {item.X} {item.Y}";
-                return hay.Contains(query, StringComparison.OrdinalIgnoreCase);
+                var itemSearchText = $"{def?.Name} {item.Note} {item.X} {item.Y}";
+                return itemSearchText.Contains(query, StringComparison.OrdinalIgnoreCase);
             });
         }
 
@@ -2386,7 +2384,7 @@ public sealed class MainForm : Form
 
     private void ApplyInspectorChanges()
     {
-        if (_suppressUiEvents || _canvas.SelectedItems.Count != 1)
+        if (_isSuppressingUiEvents || _canvas.SelectedItems.Count != 1)
         {
             return;
         }
@@ -2463,7 +2461,7 @@ public sealed class MainForm : Form
         profile.EnsureDefaults();
         _canvas.Project.DeviceHub = profile;
 
-        _suppressUiEvents = true;
+        _isSuppressingUiEvents = true;
         try
         {
             _deviceHubGitHubText.Text = profile.GitHubRepositoryUrl;
@@ -2478,7 +2476,7 @@ public sealed class MainForm : Form
         }
         finally
         {
-            _suppressUiEvents = false;
+            _isSuppressingUiEvents = false;
         }
 
         var workspaceRoot = GetWorkspaceRootPath();
@@ -2525,7 +2523,7 @@ public sealed class MainForm : Form
 
     private void ApplyDeviceHubConfig()
     {
-        if (_suppressUiEvents)
+        if (_isSuppressingUiEvents)
         {
             return;
         }
@@ -2817,7 +2815,7 @@ public sealed class MainForm : Form
     private void RefreshSelectionUi()
     {
         var selected = _canvas.SelectedItems;
-        _suppressUiEvents = true;
+        _isSuppressingUiEvents = true;
         try
         {
             if (selected.Count == 0)
@@ -2883,7 +2881,7 @@ public sealed class MainForm : Form
         }
         finally
         {
-            _suppressUiEvents = false;
+            _isSuppressingUiEvents = false;
         }
     }
 
@@ -3944,9 +3942,9 @@ public sealed class MainForm : Form
         try
         {
             var project = await _projectService.LoadAsync(dialog.FileName).ConfigureAwait(false);
-            NormalizeProject(project);
-            _currentPath = dialog.FileName;
-            _isDirty = false;
+            EnsureProjectDefaults(project);
+            _currentProjectFilePath = dialog.FileName;
+            _hasUnsavedChanges = false;
             _scenarioBaseline = null;
             _canvas.Project = project;
             // Marshal back to UI thread for UI updates
@@ -3972,7 +3970,7 @@ public sealed class MainForm : Form
 
     private async void SaveProject(bool forceChoosePath)
     {
-        var path = _currentPath;
+        var path = _currentProjectFilePath;
         if (forceChoosePath || string.IsNullOrWhiteSpace(path))
         {
             using var dialog = new SaveFileDialog
@@ -3988,13 +3986,13 @@ public sealed class MainForm : Form
             }
 
             path = dialog.FileName;
-            _currentPath = path;
+            _currentProjectFilePath = path;
         }
 
         try
         {
             await _projectService.SaveAsync(_canvas.Project, path!).ConfigureAwait(false);
-            _isDirty = false;
+            _hasUnsavedChanges = false;
             if (InvokeRequired)
             {
                 Invoke(() => _statusLabel.Text = $"Saved {Path.GetFileName(path)}.");
@@ -4072,7 +4070,7 @@ public sealed class MainForm : Form
         }
     }
 
-    private static PlannerProject NormalizeProject(PlannerProject project)
+    private static PlannerProject EnsureProjectDefaults(PlannerProject project)
     {
         project.PresetId = string.IsNullOrWhiteSpace(project.PresetId) ? "custom" : project.PresetId;
         project.LayerVisibility ??= new LayerVisibilitySettings();
@@ -4241,7 +4239,7 @@ public sealed class MainForm : Form
 
     private void UpdateWindowTitle()
     {
-        var dirtyPrefix = _isDirty ? "* " : string.Empty;
+        var dirtyPrefix = _hasUnsavedChanges ? "* " : string.Empty;
         var projectName = string.IsNullOrWhiteSpace(_canvas.Project.Name) ? "Untitled CAMP" : _canvas.Project.Name;
         Text = $"{dirtyPrefix}FO76 CAMP Planner - {projectName}";
     }
@@ -4279,7 +4277,7 @@ public sealed class MainForm : Form
 
     private void MarkDirty()
     {
-        _isDirty = true;
+        _hasUnsavedChanges = true;
         UpdateWindowTitle();
     }
 

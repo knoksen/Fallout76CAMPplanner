@@ -10,7 +10,7 @@ public sealed class PlannerCanvas : Control
     private PlannerProject _project = new();
     private readonly HashSet<Guid> _selectedIds = new();
     private bool _draggingSelection;
-    private bool _dragChanged;
+    private bool _selectionDragMoved;
     private Point _dragStartGrid;
     private PlannerProject? _dragStartSnapshot;
     private bool _marqueeSelecting;
@@ -20,7 +20,7 @@ public sealed class PlannerCanvas : Control
     private readonly Stack<PlannerProject> _undoStack = new();
     private readonly Stack<PlannerProject> _redoStack = new();
     private BlueprintModule? _loadedBlueprint;
-    private bool _hoverGridValid;
+    private bool _isHoverGridValid;
     private Point _hoverGrid;
     private PlacedItem? _hoverItem;
     private ToolType _currentTool = ToolType.Select;
@@ -89,7 +89,7 @@ public sealed class PlannerCanvas : Control
     public PlacedItem? SelectedItem => SelectedItems.FirstOrDefault();
     public IReadOnlyList<PlacedItem> SelectedItems => _project.Items.Where(x => _selectedIds.Contains(x.Id)).ToList();
     public BlueprintModule? LoadedBlueprint => _loadedBlueprint;
-    public Point? HoverGridPoint => _hoverGridValid ? _hoverGrid : null;
+    public Point? HoverGridPoint => _isHoverGridValid ? _hoverGrid : null;
 
     public event EventHandler? ProjectChanged;
     public event EventHandler? SelectionChanged;
@@ -132,7 +132,7 @@ public sealed class PlannerCanvas : Control
         base.OnMouseDown(e);
         Focus();
 
-        if (!TryGetGridPoint(e.Location, out var gridPoint))
+        if (!TryGetGridPointFromPixel(e.Location, out var gridPoint))
         {
             return;
         }
@@ -177,8 +177,8 @@ public sealed class PlannerCanvas : Control
                 return;
             }
 
-            var hit = HitTest(gridPoint);
-            var lockedHit = hit ?? HitTest(gridPoint, includeLocked: true);
+            var hit = FindItemAtGridPoint(gridPoint);
+            var lockedHit = hit ?? FindItemAtGridPoint(gridPoint, includeLocked: true);
             if (hit is null && lockedHit is not null && IsItemLocked(lockedHit))
             {
                 var lockedName = Catalog.ById.TryGetValue(lockedHit.DefinitionId, out var lockedDefinition)
@@ -207,7 +207,7 @@ public sealed class PlannerCanvas : Control
                 if (e.Button == MouseButtons.Left)
                 {
                     _draggingSelection = true;
-                    _dragChanged = false;
+                    _selectionDragMoved = false;
                     _dragStartGrid = gridPoint;
                     _dragStartSnapshot = CloneProject(_project);
                     UpdateCursor();
@@ -231,8 +231,8 @@ public sealed class PlannerCanvas : Control
 
         if (CurrentTool == ToolType.Erase)
         {
-            var hit = HitTest(gridPoint);
-            var lockedHit = hit ?? HitTest(gridPoint, includeLocked: true);
+            var hit = FindItemAtGridPoint(gridPoint);
+            var lockedHit = hit ?? FindItemAtGridPoint(gridPoint, includeLocked: true);
             if (hit is null && lockedHit is not null && IsItemLocked(lockedHit))
             {
                 var lockedName = Catalog.ById.TryGetValue(lockedHit.DefinitionId, out var lockedDefinition)
@@ -299,21 +299,37 @@ public sealed class PlannerCanvas : Control
     {
         base.OnMouseMove(e);
 
-        if (TryGetGridPoint(e.Location, out var hoverGrid))
+        if (TryGetGridPointFromPixel(e.Location, out var hoverGrid))
         {
-            _hoverGridValid = true;
+            _isHoverGridValid = true;
             _hoverGrid = hoverGrid;
         }
         else
         {
-            _hoverGridValid = false;
+            _isHoverGridValid = false;
         }
 
         // Update hovered item tracking for visual feedback when not in an active drag operation
         if (!_draggingSelection && !_marqueeSelecting && _draggingMarkerId is null && _draggingTrapZoneId is null)
         {
-            var newHoverItem = (_hoverGridValid && _currentTool is ToolType.Select or ToolType.Erase)
-                ? HitTest(_hoverGrid)
+            var newHoverItem = (_isHoverGridValid && _currentTool is ToolType.Select or ToolType.Erase)
+                ? FindItemAtGridPoint(_hoverGrid)
+                : null;
+
+            if (!ReferenceEquals(newHoverItem, _hoverItem))
+            {
+                _hoverItem = newHoverItem;
+                Invalidate();
+            }
+
+            UpdateCursor();
+        }
+
+        // Update hovered item tracking for visual feedback when not in an active drag operation
+        if (!_draggingSelection && !_marqueeSelecting && _draggingMarkerId is null && _draggingTrapZoneId is null)
+        {
+            var newHoverItem = (_isHoverGridValid && _currentTool is ToolType.Select or ToolType.Erase)
+                ? FindItemAtGridPoint(_hoverGrid)
                 : null;
 
             if (!ReferenceEquals(newHoverItem, _hoverItem))
@@ -327,7 +343,7 @@ public sealed class PlannerCanvas : Control
 
         if (_marqueeSelecting)
         {
-            if (_hoverGridValid)
+            if (_isHoverGridValid)
             {
                 _marqueeCurrentGrid = _hoverGrid;
                 Invalidate();
@@ -337,7 +353,7 @@ public sealed class PlannerCanvas : Control
 
         if (_draggingMarkerId is Guid markerId)
         {
-            if (!_hoverGridValid)
+            if (!_isHoverGridValid)
             {
                 return;
             }
@@ -364,7 +380,7 @@ public sealed class PlannerCanvas : Control
 
         if (_draggingTrapZoneId is Guid trapZoneId && _dragTrapZoneSnapshot is not null)
         {
-            if (!_hoverGridValid)
+            if (!_isHoverGridValid)
             {
                 return;
             }
@@ -418,7 +434,7 @@ public sealed class PlannerCanvas : Control
             return;
         }
 
-        if (!TryGetGridPoint(e.Location, out var currentGrid))
+        if (!TryGetGridPointFromPixel(e.Location, out var currentGrid))
         {
             return;
         }
@@ -464,7 +480,7 @@ public sealed class PlannerCanvas : Control
         }
         else
         {
-            _dragChanged = delta.X != 0 || delta.Y != 0;
+            _selectionDragMoved = delta.X != 0 || delta.Y != 0;
         }
 
         Invalidate();
@@ -534,7 +550,7 @@ public sealed class PlannerCanvas : Control
         if (_draggingSelection)
         {
             _draggingSelection = false;
-            if (_dragChanged && _dragStartSnapshot is not null)
+            if (_selectionDragMoved && _dragStartSnapshot is not null)
             {
                 PushUndoSnapshot(_dragStartSnapshot);
                 RaiseProjectChanged();
@@ -549,7 +565,7 @@ public sealed class PlannerCanvas : Control
     protected override void OnMouseLeave(EventArgs e)
     {
         base.OnMouseLeave(e);
-        _hoverGridValid = false;
+        _isHoverGridValid = false;
         _hoverItem = null;
 
         if (_draggingMarkerId is not null)
@@ -1953,7 +1969,7 @@ public sealed class PlannerCanvas : Control
 
     private Point? GetMarkerAnchorPoint()
     {
-        if (_hoverGridValid)
+        if (_isHoverGridValid)
         {
             return _hoverGrid;
         }
@@ -2178,7 +2194,7 @@ public sealed class PlannerCanvas : Control
 
     private void DrawHoverFeedback(Graphics g, Point origin, int cell)
     {
-        if (!_hoverGridValid || _draggingSelection || _marqueeSelecting)
+        if (!_isHoverGridValid || _draggingSelection || _marqueeSelecting)
         {
             return;
         }
@@ -2248,7 +2264,7 @@ public sealed class PlannerCanvas : Control
 
     private void DrawPlacementPreview(Graphics g, Point origin, int cell)
     {
-        if (!_hoverGridValid || CurrentTool is ToolType.Select or ToolType.Erase)
+        if (!_isHoverGridValid || CurrentTool is ToolType.Select or ToolType.Erase)
         {
             _placementPreviewMessage = null;
             return;
@@ -2274,18 +2290,18 @@ public sealed class PlannerCanvas : Control
         var reason = ValidatePlacement(preview, definition);
         var size = GetSize(definition, preview.Rotation);
         var rect = new Rectangle(origin.X + preview.X * cell, origin.Y + preview.Y * cell, size.Width * cell, size.Height * cell);
-        var ok = reason is null;
-        _placementPreviewMessage = ok ? "Placement valid." : reason;
+        var isPlacementValid = reason is null;
+        _placementPreviewMessage = isPlacementValid ? "Placement valid." : reason;
 
-        using var fill = new SolidBrush(Color.FromArgb(ok ? 74 : 96, ok ? 90 : 220, ok ? 210 : 90, ok ? 130 : 90));
-        using var pen = new Pen(Color.FromArgb(ok ? 235 : 250, ok ? 90 : 220, ok ? 210 : 90, ok ? 130 : 90), 2.2f) { DashStyle = DashStyle.Dash };
+        using var fill = new SolidBrush(Color.FromArgb(isPlacementValid ? 74 : 96, isPlacementValid ? 90 : 220, isPlacementValid ? 210 : 90, isPlacementValid ? 130 : 90));
+        using var pen = new Pen(Color.FromArgb(isPlacementValid ? 235 : 250, isPlacementValid ? 90 : 220, isPlacementValid ? 210 : 90, isPlacementValid ? 130 : 90), 2.2f) { DashStyle = DashStyle.Dash };
         g.FillRectangle(fill, rect);
         g.DrawRectangle(pen, rect);
 
         using var labelBrush = new SolidBrush(Color.FromArgb(245, 245, 245));
         using var font = new Font("Segoe UI", Math.Max(8f, cell / 5.2f), FontStyle.Bold);
-        var sf = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
-        g.DrawString(ok ? "+" : "!", font, labelBrush, rect, sf);
+        var centeredStringFormat = new StringFormat { Alignment = StringAlignment.Center, LineAlignment = StringAlignment.Center };
+        g.DrawString(isPlacementValid ? "+" : "!", font, labelBrush, rect, centeredStringFormat);
     }
 
     private void DrawFooterHints(Graphics g, Point origin, int totalWidth, int totalHeight)
@@ -2295,7 +2311,7 @@ public sealed class PlannerCanvas : Control
         using var softBrush = new SolidBrush(Color.FromArgb(170, 184, 196));
         using var accentBrush = new SolidBrush(Color.FromArgb(245, 188, 57));
 
-        var left = _hoverGridValid
+        var left = _isHoverGridValid
             ? $"Hover: ({_hoverGrid.X}, {_hoverGrid.Y})   •   Active tool: {CurrentTool}"
             : $"Active tool: {CurrentTool}";
         var right = _project.Items.Count == 0
@@ -2768,7 +2784,7 @@ public sealed class PlannerCanvas : Control
     private bool HasFoundationAt(int x, int y)
         => _project.Items.Any(item => Catalog.ById.TryGetValue(item.DefinitionId, out var definition) && definition.Id == "foundation" && item.X == x && item.Y == y);
 
-    private PlacedItem? HitTest(Point gridPoint, bool includeLocked = false)
+    private PlacedItem? FindItemAtGridPoint(Point gridPoint, bool includeLocked = false)
     {
         for (var i = _project.Items.Count - 1; i >= 0; i--)
         {
@@ -2794,7 +2810,7 @@ public sealed class PlannerCanvas : Control
         return null;
     }
 
-    private bool TryGetGridPoint(Point point, out Point gridPoint)
+    private bool TryGetGridPointFromPixel(Point point, out Point gridPoint)
     {
         var cell = GetScaledCellSize();
         var origin = new Point(CanvasPadding, CanvasPadding);

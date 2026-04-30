@@ -75,9 +75,9 @@ public sealed class MinimapPanel : Control
         var viewport = new Rectangle(10, 36, Width - 20, Height - 46);
         e.Graphics.DrawRectangle(borderPen, viewport);
 
-        var sx = viewport.Width / (float)_project.GridWidth;
-        var sy = viewport.Height / (float)_project.GridHeight;
-        var scale = Math.Min(sx, sy);
+        var scaleX = viewport.Width / (float)_project.GridWidth;
+        var scaleY = viewport.Height / (float)_project.GridHeight;
+        var scale = Math.Min(scaleX, scaleY);
         var mapWidth = _project.GridWidth * scale;
         var mapHeight = _project.GridHeight * scale;
         var mapRect = new RectangleF(
@@ -124,13 +124,13 @@ public sealed class MinimapPanel : Control
 
         var centerX = _project.CampCenterX >= 0 ? _project.CampCenterX : _project.GridWidth / 2;
         var centerY = _project.CampCenterY >= 0 ? _project.CampCenterY : _project.GridHeight / 2;
-        var cx = mapRect.X + ((centerX + 0.5f) * scale);
-        var cy = mapRect.Y + ((centerY + 0.5f) * scale);
+        var campCenterPixelX = mapRect.X + ((centerX + 0.5f) * scale);
+        var campCenterPixelY = mapRect.Y + ((centerY + 0.5f) * scale);
         using (var centerPen = new Pen(Color.FromArgb(90, 255, 255, 255), 1.2f))
         {
-            e.Graphics.DrawEllipse(centerPen, cx - 4, cy - 4, 8, 8);
-            e.Graphics.DrawLine(centerPen, cx - 6, cy, cx + 6, cy);
-            e.Graphics.DrawLine(centerPen, cx, cy - 6, cx, cy + 6);
+            e.Graphics.DrawEllipse(centerPen, campCenterPixelX - 4, campCenterPixelY - 4, 8, 8);
+            e.Graphics.DrawLine(centerPen, campCenterPixelX - 6, campCenterPixelY, campCenterPixelX + 6, campCenterPixelY);
+            e.Graphics.DrawLine(centerPen, campCenterPixelX, campCenterPixelY - 6, campCenterPixelX, campCenterPixelY + 6);
         }
 
         if (_hoverGrid.HasValue)
