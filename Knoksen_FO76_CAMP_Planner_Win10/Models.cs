@@ -819,3 +819,112 @@ public sealed class MobilePortableItem
     public int Quantity { get; set; } = 1;
     public string? Notes { get; set; }
 }
+
+// ─── Premium / Monetization ───────────────────────────────────────────────────
+
+public enum PremiumTier
+{
+    Free = 0,
+    Pro = 1,           // One-time purchase — PDF export, all challenges, Sprint Mode
+    VaultTecElite = 2  // One-time purchase — everything + blueprint packs + AI hints
+}
+
+public sealed class PremiumState
+{
+    public PremiumTier Tier { get; set; } = PremiumTier.Free;
+    public string LicenseKey { get; set; } = string.Empty;
+    public DateTime? ActivatedAtUtc { get; set; }
+    public bool Has(PremiumTier required) => Tier >= required;
+    public string TierDisplayName => Tier switch
+    {
+        PremiumTier.Pro => "Pro",
+        PremiumTier.VaultTecElite => "Vault-Tec Elite",
+        _ => "Free"
+    };
+}
+
+// ─── CAMP Score ───────────────────────────────────────────────────────────────
+
+public sealed record CampScore(
+    int BudgetEfficiency,   // 0–250
+    int DefenseCoverage,    // 0–250
+    int PowerNetwork,       // 0–200
+    int VisitorFlow,        // 0–200
+    int Aesthetics)         // 0–100
+{
+    public int Total => BudgetEfficiency + DefenseCoverage + PowerNetwork + VisitorFlow + Aesthetics;
+    public string Grade => Total switch
+    {
+        >= 900 => "S",
+        >= 750 => "A",
+        >= 550 => "B",
+        >= 350 => "C",
+        _      => "F"
+    };
+    public Color GradeColor => Grade switch
+    {
+        "S" => Color.FromArgb(255, 215, 0),
+        "A" => Color.FromArgb(112, 211, 138),
+        "B" => Color.FromArgb(74, 144, 226),
+        "C" => Color.FromArgb(246, 188, 57),
+        _   => Color.FromArgb(224, 80, 80)
+    };
+}
+
+// ─── Challenges ───────────────────────────────────────────────────────────────
+
+public sealed class ChallengeConstraint
+{
+    public string Description { get; init; } = string.Empty;
+    public required Func<PlannerProject, bool> Predicate { get; init; }
+}
+
+public sealed class ChallengeDefinition
+{
+    public string Id { get; init; } = string.Empty;
+    public string Name { get; init; } = string.Empty;
+    public string Description { get; init; } = string.Empty;
+    public PremiumTier RequiredTier { get; init; } = PremiumTier.Free;
+    public IReadOnlyList<ChallengeConstraint> Constraints { get; init; } = Array.Empty<ChallengeConstraint>();
+
+    [System.Text.Json.Serialization.JsonIgnore]
+    public string DisplayName => RequiredTier == PremiumTier.Free
+        ? Name
+        : $"{Name}  [{RequiredTier}]";
+}
+
+public sealed class ChallengeConstraintResult
+{
+    public string Description { get; init; } = string.Empty;
+    public bool IsMet { get; init; }
+}
+
+// ─── Achievements ─────────────────────────────────────────────────────────────
+
+public enum AchievementId
+{
+    FirstBlueprint,
+    BudgetMaster,
+    Fortress,
+    OpenForBusiness,
+    VisitorReady,
+    TrapArchitect,
+    PowerGrid,
+    PlannerElite
+}
+
+public sealed class AchievementDefinition
+{
+    public AchievementId Id { get; init; }
+    public string Name { get; init; } = string.Empty;
+    public string Description { get; init; } = string.Empty;
+    public string Icon { get; init; } = "★";
+    public PremiumTier RequiredTier { get; init; } = PremiumTier.Free;
+}
+
+public sealed class AppLifetimeStats
+{
+    public int TotalSaves { get; set; }
+    public int TotalItemsPlaced { get; set; }
+    public HashSet<string> UnlockedAchievements { get; set; } = new();
+}

@@ -34,6 +34,10 @@ public sealed class PlannerCanvas : Control
     private Point _dragTrapStartGrid;
     private Rectangle _dragTrapStartRect;
     private string? _placementPreviewMessage;
+    private bool _isPanning;
+    private Point _panOffset;
+    private Point _panAnchor;
+    private readonly ToolTip _hoverToolTip = new() { ShowAlways = true, InitialDelay = 400, AutoPopDelay = 6000 };
 
     public PlannerCanvas()
     {
@@ -91,6 +95,8 @@ public sealed class PlannerCanvas : Control
     public BlueprintModule? LoadedBlueprint => _loadedBlueprint;
     public Point? HoverGridPoint => _isHoverGridValid ? _hoverGrid : null;
 
+    private Point CanvasOrigin => new Point(CanvasPadding + _panOffset.X, CanvasPadding + _panOffset.Y);
+
     public event EventHandler? ProjectChanged;
     public event EventHandler? SelectionChanged;
     public event EventHandler? HistoryChanged;
@@ -108,7 +114,7 @@ public sealed class PlannerCanvas : Control
         var cell = GetScaledCellSize();
         var totalWidth = _project.GridWidth * cell;
         var totalHeight = _project.GridHeight * cell;
-        var origin = new Point(CanvasPadding, CanvasPadding);
+        var origin = CanvasOrigin;
 
         using var canvasBrush = new SolidBrush(Color.FromArgb(36, 40, 46));
         e.Graphics.FillRectangle(canvasBrush, origin.X, origin.Y, totalWidth, totalHeight);
@@ -125,12 +131,21 @@ public sealed class PlannerCanvas : Control
         DrawBlueprintGhost(e.Graphics, origin, cell);
         DrawHeader(e.Graphics, origin, totalWidth);
         DrawFooterHints(e.Graphics, origin, totalWidth, totalHeight);
+        DrawContextualActionBar(e.Graphics, origin, cell);
     }
 
     protected override void OnMouseDown(MouseEventArgs e)
     {
         base.OnMouseDown(e);
         Focus();
+
+        if (e.Button == MouseButtons.Middle)
+        {
+            _isPanning = true;
+            _panAnchor = new Point(e.X - _panOffset.X, e.Y - _panOffset.Y);
+            Cursor = Cursors.SizeAll;
+            return;
+        }
 
         if (!TryGetGridPointFromPixel(e.Location, out var gridPoint))
         {
@@ -299,6 +314,13 @@ public sealed class PlannerCanvas : Control
     {
         base.OnMouseMove(e);
 
+        if (_isPanning)
+        {
+            _panOffset = new Point(e.X - _panAnchor.X, e.Y - _panAnchor.Y);
+            Invalidate();
+            return;
+        }
+
         if (TryGetGridPointFromPixel(e.Location, out var hoverGrid))
         {
             _isHoverGridValid = true;
@@ -319,22 +341,10 @@ public sealed class PlannerCanvas : Control
             if (!ReferenceEquals(newHoverItem, _hoverItem))
             {
                 _hoverItem = newHoverItem;
-                Invalidate();
-            }
-
-            UpdateCursor();
-        }
-
-        // Update hovered item tracking for visual feedback when not in an active drag operation
-        if (!_draggingSelection && !_marqueeSelecting && _draggingMarkerId is null && _draggingTrapZoneId is null)
-        {
-            var newHoverItem = (_isHoverGridValid && _currentTool is ToolType.Select or ToolType.Erase)
-                ? FindItemAtGridPoint(_hoverGrid)
-                : null;
-
-            if (!ReferenceEquals(newHoverItem, _hoverItem))
-            {
-                _hoverItem = newHoverItem;
+                if (_hoverItem is null)
+                    _hoverToolTip.Hide(this);
+                else
+                    _hoverToolTip.Show(BuildItemTooltipText(_hoverItem), this, e.X + 14, e.Y + 14, 6000);
                 Invalidate();
             }
 
@@ -490,6 +500,13 @@ public sealed class PlannerCanvas : Control
     {
         base.OnMouseUp(e);
 
+        if (e.Button == MouseButtons.Middle && _isPanning)
+        {
+            _isPanning = false;
+            UpdateCursor();
+            return;
+        }
+
         if (_marqueeSelecting)
         {
             _marqueeSelecting = false;
@@ -588,7 +605,7 @@ public sealed class PlannerCanvas : Control
     }
 
     protected override bool IsInputKey(Keys keyData)
-        => keyData is Keys.Delete or Keys.R or Keys.Add or Keys.Subtract or Keys.Left or Keys.Right or Keys.Up or Keys.Down
+        => keyData is Keys.Delete or Keys.R or Keys.Add or Keys.Subtract or Keys.Left or Keys.Right or Keys.Up or Keys.Down or Keys.Home
            || base.IsInputKey(keyData);
 
     protected override void OnKeyDown(KeyEventArgs e)
@@ -628,6 +645,13 @@ public sealed class PlannerCanvas : Control
         if (e.KeyCode == Keys.Subtract || e.KeyCode == Keys.OemMinus)
         {
             ZoomPercent -= 10;
+            return;
+        }
+
+        if (e.KeyCode == Keys.Home)
+        {
+            _panOffset = Point.Empty;
+            Invalidate();
             return;
         }
 
@@ -1996,7 +2020,7 @@ public sealed class PlannerCanvas : Control
         }
 
         var cell = GetScaledCellSize();
-        var origin = new Point(CanvasPadding, CanvasPadding);
+        var origin = CanvasOrigin;
         var threshold = Math.Max(8f, cell * 0.22f);
         foreach (var candidate in _project.VisitorMarkers.OrderByDescending(x => x.Order))
         {
@@ -2022,7 +2046,7 @@ public sealed class PlannerCanvas : Control
         }
 
         var cell = GetScaledCellSize();
-        var origin = new Point(CanvasPadding, CanvasPadding);
+        var origin = CanvasOrigin;
         foreach (var candidate in _project.TrapZones)
         {
             var rect = GetTrapZonePixelRect(origin, cell, candidate);
@@ -2045,7 +2069,7 @@ public sealed class PlannerCanvas : Control
         }
 
         var cell = GetScaledCellSize();
-        var origin = new Point(CanvasPadding, CanvasPadding);
+        var origin = CanvasOrigin;
         foreach (var candidate in _project.TrapZones)
         {
             var handleRect = GetTrapZoneResizeHandleRect(origin, cell, candidate);
@@ -2246,7 +2270,7 @@ public sealed class PlannerCanvas : Control
 
     private void UpdateCursor()
     {
-        if (_draggingSelection || _draggingMarkerId is not null || _draggingTrapZoneId is not null)
+        if (_isPanning || _draggingSelection || _draggingMarkerId is not null || _draggingTrapZoneId is not null)
         {
             Cursor = Cursors.SizeAll;
             return;
@@ -2304,6 +2328,13 @@ public sealed class PlannerCanvas : Control
         g.DrawString(isPlacementValid ? "+" : "!", font, labelBrush, rect, centeredStringFormat);
     }
 
+    private string BuildItemTooltipText(PlacedItem item)
+    {
+        if (!Catalog.ById.TryGetValue(item.DefinitionId, out var def))
+            return $"Unknown item ({item.DefinitionId})";
+        return $"{def.Name}\nSize: {def.Width}\u00d7{def.Height}  ·  Budget: {def.BudgetCost}\nLayer: {def.Layer}";
+    }
+
     private void DrawFooterHints(Graphics g, Point origin, int totalWidth, int totalHeight)
     {
         var y = origin.Y + totalHeight + 8;
@@ -2316,7 +2347,7 @@ public sealed class PlannerCanvas : Control
             : $"Active tool: {CurrentTool}";
         var right = _project.Items.Count == 0
             ? "First run: place foundations, then move through Layout → Envelope → Systems → Defense → Polish."
-            : "Ctrl+Click multi-select   •   R rotate   •   Del remove   •   +/- zoom";
+            : "Ctrl+Click multi-select   •   R rotate   •   Del remove   •   +/- zoom   •   MMB pan   •   F1–F12 switch tool";
         if (!string.IsNullOrWhiteSpace(_placementPreviewMessage) && CurrentTool is not ToolType.Select and not ToolType.Erase)
         {
             right = _placementPreviewMessage;
@@ -2325,6 +2356,58 @@ public sealed class PlannerCanvas : Control
 
         var sf = new StringFormat { Alignment = StringAlignment.Far };
         g.DrawString(right, font, softBrush, new RectangleF(origin.X + totalWidth * 0.5f, y, totalWidth * 0.5f, 18), sf);
+    }
+
+    /// <summary>
+    /// Draws a floating HUD bar at the bottom-right of the canvas showing
+    /// context-sensitive shortcuts when one or more items are selected.
+    /// </summary>
+    private void DrawContextualActionBar(Graphics g, Point origin, int cell)
+    {
+        if (_selectedIds.Count == 0) return;
+
+        var bounds = GetSelectionBounds();
+        if (bounds is null) return;
+
+        // Position bar just below the selection bounding box, clamped to canvas
+        var cell2 = cell;
+        var barX = origin.X + bounds.Value.X * cell2;
+        var barY = origin.Y + (bounds.Value.Y + bounds.Value.Height) * cell2 + 6;
+        const int barH = 26;
+        const int barPad = 8;
+
+        var actions = _selectedIds.Count == 1
+            ? new[] { "R  Rotate", "Ctrl+D  Dup", "Del  Remove", "Arrows  Nudge" }
+            : new[] { $"{_selectedIds.Count} selected", "R  Rotate Group", "Ctrl+D  Dup", "Del  Remove" };
+
+        using var barFont = new Font("Segoe UI", 8f);
+        var textWidths = actions.Select(a => g.MeasureString(a, barFont).Width).ToArray();
+        var totalW = textWidths.Sum() + (actions.Length - 1) * barPad * 2 + barPad * 2;
+
+        // Clamp to canvas width
+        var canvasRight = origin.X + _project.GridWidth * cell2;
+        barX = Math.Min(barX, canvasRight - (int)totalW - 4);
+        barX = Math.Max(origin.X + 4, barX);
+
+        using var pillBrush = new SolidBrush(Color.FromArgb(200, 27, 33, 41));
+        using var pillPen = new Pen(Color.FromArgb(200, 58, 68, 82), 1f);
+        var pillRect = new RectangleF(barX, barY, totalW, barH);
+        g.FillRectangle(pillBrush, pillRect);
+        g.DrawRectangle(pillPen, barX, barY, totalW, barH);
+
+        using var textBrush = new SolidBrush(Color.FromArgb(220, 235, 239, 244));
+        using var sepPen = new Pen(Color.FromArgb(80, 80, 80), 1f);
+        var cx = barX + barPad;
+        for (var i = 0; i < actions.Length; i++)
+        {
+            g.DrawString(actions[i], barFont, textBrush, cx, barY + 6);
+            cx += (int)textWidths[i] + barPad;
+            if (i < actions.Length - 1)
+            {
+                g.DrawLine(sepPen, cx, barY + 4, cx, barY + barH - 4);
+                cx += barPad;
+            }
+        }
     }
 
     private void DrawBlueprintGhost(Graphics g, Point origin, int cell)
@@ -2813,7 +2896,7 @@ public sealed class PlannerCanvas : Control
     private bool TryGetGridPointFromPixel(Point point, out Point gridPoint)
     {
         var cell = GetScaledCellSize();
-        var origin = new Point(CanvasPadding, CanvasPadding);
+        var origin = CanvasOrigin;
         var x = point.X - origin.X;
         var y = point.Y - origin.Y;
 

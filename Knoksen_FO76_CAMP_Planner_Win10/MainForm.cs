@@ -108,6 +108,27 @@ public sealed class MainForm : Form
 
     private ToolStripButton? _undoButton;
     private ToolStripButton? _redoButton;
+
+    // ── Game / Gamification UI ────────────────────────────────────────────────
+    private Label? _campScoreLabel;
+    private Label? _campGradeLabel;
+    private Panel? _budgetRingPanel;
+    private int _budgetRingUsed;
+    private int _budgetRingTotal;
+    private Label? _nextActionLabel;
+    private Label? _activeChallengeLabel;
+    private Label? _challengeConstraintLabel;
+    private Label? _achievementStripLabel;
+    private Label? _premiumTierLabel;
+    private ComboBox? _challengeCombo;
+    private ChallengeDefinition? _activeChallenge;
+
+    // ── Toast + status bar score ──────────────────────────────────────────────
+    private Panel? _toastPanel;
+    private Label? _toastLabel;
+    private readonly System.Windows.Forms.Timer _toastTimer = new() { Interval = 3500 };
+    private readonly ToolStripStatusLabel _scoreStatusLabel = new() { Spring = true, TextAlign = ContentAlignment.MiddleRight, ForeColor = Color.FromArgb(170, 180, 192) };
+
     private CheckBox? _showCampRadiusCheck;
     private CheckBox? _showTurretCoverageCheck;
     private CheckBox? _showVisitorFlowCheck;
@@ -348,6 +369,7 @@ public sealed class MainForm : Form
         _statusStrip.ForeColor = TextSecondary;
         _statusStrip.SizingGrip = false;
         _statusStrip.Items.Add(_statusLabel);
+        _statusStrip.Items.Add(_scoreStatusLabel);
 
         Controls.Add(mainContainer);
         Controls.Add(_statusStrip);
@@ -356,6 +378,8 @@ public sealed class MainForm : Form
         mainContainer.Panel1MinSize = 900;
         mainContainer.Panel2MinSize = 360;
         mainContainer.SplitterDistance = 1120;
+
+        SetupToastPanel();
     }
 
     private Control BuildTopHeader()
@@ -537,18 +561,21 @@ public sealed class MainForm : Form
         var libraryPage = MakeTabPage("Library");
         var inspectPage = MakeTabPage("Inspect");
         var deviceHubPage = MakeTabPage("Device Hub");
+        var gamePage = MakeTabPage("Game ★");
 
         overviewPage.Controls.Add(BuildOverviewTab());
         buildPage.Controls.Add(BuildBuildTab());
         libraryPage.Controls.Add(BuildLibraryTab());
         inspectPage.Controls.Add(BuildInspectTab());
         deviceHubPage.Controls.Add(BuildDeviceHubTab());
+        gamePage.Controls.Add(BuildGameTab());
 
         tabs.TabPages.Add(overviewPage);
         tabs.TabPages.Add(buildPage);
         tabs.TabPages.Add(libraryPage);
         tabs.TabPages.Add(inspectPage);
         tabs.TabPages.Add(deviceHubPage);
+        tabs.TabPages.Add(gamePage);
 
         panel.Controls.Add(tabs);
         return panel;
@@ -812,6 +839,207 @@ public sealed class MainForm : Form
         };
         layout.ColumnStyles.Add(new ColumnStyle(SizeType.Percent, 100f));
         return layout;
+    }
+
+    // ──────────────────────────────────────────────────────────────────────────
+    // Game Tab
+    // ──────────────────────────────────────────────────────────────────────────
+
+    private Control BuildGameTab()
+    {
+        var layout = BuildTabLayout();
+        layout.Controls.Add(MakeSection("Tier & Upgrade", BuildPremiumSection()), 0, 0);
+        layout.Controls.Add(MakeSection("CAMP Score", BuildCampScoreSection()), 0, 1);
+        layout.Controls.Add(MakeSection("Next Action", BuildNextActionSection()), 0, 2);
+        layout.Controls.Add(MakeSection("Challenges", BuildChallengesSection()), 0, 3);
+        layout.Controls.Add(MakeSection("Achievements", BuildAchievementsSection()), 0, 4);
+        return layout;
+    }
+
+    private Control BuildPremiumSection()
+    {
+        var flow = BuildVerticalFlow();
+
+        _premiumTierLabel = new Label
+        {
+            AutoSize = true,
+            MaximumSize = new Size(300, 0),
+            ForeColor = Accent,
+            Font = new Font("Segoe UI Semibold", 10f, FontStyle.Bold)
+        };
+
+        var infoLabel = new Label
+        {
+            AutoSize = true,
+            MaximumSize = new Size(300, 0),
+            ForeColor = TextSecondary,
+            Text = "Pro ($4.99): PDF export · all challenges · Sprint Mode\nVault-Tec Elite ($9.99): everything + blueprint packs + AI hints"
+        };
+
+        var keyText = new TextBox
+        {
+            Width = 220,
+            PlaceholderText = "FO76-PXXX-XXXX-XXXX",
+            UseSystemPasswordChar = false
+        };
+
+        var activateRow = new FlowLayoutPanel
+        {
+            AutoSize = true,
+            WrapContents = false,
+            FlowDirection = FlowDirection.LeftToRight,
+            Margin = new Padding(0, 6, 0, 0),
+            BackColor = Color.Transparent
+        };
+        activateRow.Controls.Add(keyText);
+        activateRow.Controls.Add(BuildActionButton("Activate", (_, _) =>
+        {
+            if (PremiumStore.TryActivate(keyText.Text, out var error))
+            {
+                keyText.Text = string.Empty;
+                _statusLabel.Text = $"Activated: {PremiumStore.State.TierDisplayName}. Thank you!";
+                RefreshGameUi();
+            }
+            else
+            {
+                _statusLabel.Text = $"Activation failed: {error}";
+            }
+        }));
+
+        flow.Controls.Add(_premiumTierLabel);
+        flow.Controls.Add(infoLabel);
+        flow.Controls.Add(MakeLabel("License key"));
+        flow.Controls.Add(activateRow);
+        return flow;
+    }
+
+    private Control BuildCampScoreSection()
+    {
+        var flow = BuildVerticalFlow();
+
+        // Budget ring meter — custom painted panel
+        _budgetRingPanel = new Panel
+        {
+            Width = 300,
+            Height = 110,
+            BackColor = Color.Transparent,
+            Margin = new Padding(0, 4, 0, 0)
+        };
+        _budgetRingPanel.Paint += PaintBudgetRing;
+
+        _campGradeLabel = new Label
+        {
+            AutoSize = true,
+            ForeColor = Accent,
+            Font = new Font("Segoe UI Semibold", 28f, FontStyle.Bold),
+            Text = "–",
+            Margin = new Padding(0, 0, 0, 0)
+        };
+
+        _campScoreLabel = new Label
+        {
+            AutoSize = true,
+            MaximumSize = new Size(300, 0),
+            ForeColor = TextSecondary,
+            Text = "Place items to generate a CAMP Score.",
+            Font = new Font("Segoe UI", 9f)
+        };
+
+        flow.Controls.Add(_budgetRingPanel);
+        flow.Controls.Add(_campGradeLabel);
+        flow.Controls.Add(_campScoreLabel);
+        return flow;
+    }
+
+    private Control BuildNextActionSection()
+    {
+        var flow = BuildVerticalFlow();
+        _nextActionLabel = new Label
+        {
+            AutoSize = true,
+            MaximumSize = new Size(300, 0),
+            ForeColor = TextPrimary,
+            Font = new Font("Segoe UI", 9.5f),
+            Text = "Start placing items to receive guidance."
+        };
+        flow.Controls.Add(BuildInfoPill(_nextActionLabel));
+        return flow;
+    }
+
+    private Control BuildChallengesSection()
+    {
+        var flow = BuildVerticalFlow();
+
+        _challengeCombo = new ComboBox
+        {
+            Width = 300,
+            DropDownStyle = ComboBoxStyle.DropDownList
+        };
+        PopulateChallengeCombo();
+        _challengeCombo.SelectedIndexChanged += (_, _) =>
+        {
+            _activeChallenge = _challengeCombo.SelectedItem as ChallengeDefinition;
+            RefreshChallengeUi();
+        };
+
+        _activeChallengeLabel = new Label
+        {
+            AutoSize = true,
+            MaximumSize = new Size(300, 0),
+            ForeColor = TextSecondary,
+            Text = "Select a challenge above."
+        };
+
+        _challengeConstraintLabel = new Label
+        {
+            AutoSize = true,
+            MaximumSize = new Size(300, 0),
+            ForeColor = TextSecondary,
+            Text = string.Empty
+        };
+
+        var tierNote = new Label
+        {
+            AutoSize = true,
+            MaximumSize = new Size(300, 0),
+            ForeColor = Color.FromArgb(120, 140, 160),
+            Text = "Pro and Elite challenges unlock with a license key.",
+            Font = new Font("Segoe UI", 8.5f, FontStyle.Italic)
+        };
+
+        flow.Controls.Add(MakeLabel("Active challenge"));
+        flow.Controls.Add(_challengeCombo);
+        flow.Controls.Add(BuildInfoPill(_activeChallengeLabel));
+        flow.Controls.Add(_challengeConstraintLabel);
+        flow.Controls.Add(tierNote);
+        return flow;
+    }
+
+    private Control BuildAchievementsSection()
+    {
+        var flow = BuildVerticalFlow();
+
+        _achievementStripLabel = new Label
+        {
+            AutoSize = true,
+            MaximumSize = new Size(300, 0),
+            ForeColor = TextSecondary,
+            Text = "No achievements unlocked yet.",
+            Font = new Font("Segoe UI", 9f)
+        };
+
+        var tierNote = new Label
+        {
+            AutoSize = true,
+            MaximumSize = new Size(300, 0),
+            ForeColor = Color.FromArgb(120, 140, 160),
+            Text = "Pro and Elite achievements unlock with a license key.",
+            Font = new Font("Segoe UI", 8.5f, FontStyle.Italic)
+        };
+
+        flow.Controls.Add(BuildInfoPill(_achievementStripLabel));
+        flow.Controls.Add(tierNote);
+        return flow;
     }
 
 
@@ -1568,7 +1796,7 @@ public sealed class MainForm : Form
 
         _autosaveEnabledCheck = BuildCheck("Enable autosave", true, (_, _) =>
         {
-            if (_suppressUiEvents) return;
+            if (_isSuppressingUiEvents) return;
             _canvas.Project.AutosaveEnabled = _autosaveEnabledCheck?.Checked ?? true;
             StartAutosaveTimer();
         });
@@ -1582,7 +1810,7 @@ public sealed class MainForm : Form
         };
         _autosaveIntervalInput.ValueChanged += (_, _) =>
         {
-            if (_suppressUiEvents) return;
+            if (_isSuppressingUiEvents) return;
             _canvas.Project.AutosaveIntervalMinutes = (int)_autosaveIntervalInput.Value;
             StartAutosaveTimer();
         };
@@ -2078,6 +2306,41 @@ public sealed class MainForm : Form
         RefreshProjectUi();
     }
 
+    protected override bool ProcessCmdKey(ref Message msg, Keys keyData)
+    {
+        // Global keyboard shortcuts — active regardless of which control has focus,
+        // but skip if a text box is focused (user may be typing).
+        if (ActiveControl is TextBox or NumericUpDown or ComboBox)
+        {
+            return base.ProcessCmdKey(ref msg, keyData);
+        }
+
+        var tool = keyData switch
+        {
+            Keys.F1 => (ToolType?)ToolType.Select,
+            Keys.F2 => ToolType.Foundation,
+            Keys.F3 => ToolType.Wall,
+            Keys.F4 => ToolType.Door,
+            Keys.F5 => ToolType.Stairs,
+            Keys.F6 => ToolType.Roof,
+            Keys.F7 => ToolType.Workbench,
+            Keys.F8 => ToolType.Turret,
+            Keys.F9 => ToolType.Power,
+            Keys.F10 => ToolType.Light,
+            Keys.F11 => ToolType.Decor,
+            Keys.F12 => ToolType.Erase,
+            _ => null
+        };
+
+        if (tool.HasValue)
+        {
+            SetActiveTool(tool.Value);
+            return true;
+        }
+
+        return base.ProcessCmdKey(ref msg, keyData);
+    }
+
     private void NewProject()
     {
         _currentProjectFilePath = null;
@@ -2206,6 +2469,7 @@ public sealed class MainForm : Form
             {
                 _autosaveIntervalInput.Value = ClampDecimal(project.AutosaveIntervalMinutes, _autosaveIntervalInput.Minimum, _autosaveIntervalInput.Maximum);
             }
+            RefreshGameUi();
             UpdateWindowTitle();
         }
         finally
@@ -2381,6 +2645,262 @@ public sealed class MainForm : Form
         _focusLabel.Text = $"Visible focus: {string.Join(", ", visible)}\nOverlays: radius {(_canvas.Project.ShowCampRadiusOverlay ? "On" : "Off")}, turret {(_canvas.Project.ShowTurretCoverage ? "On" : "Off")}";
     }
 
+    // ──────────────────────────────────────────────────────────────────────────
+    // Game UI refresh
+    // ──────────────────────────────────────────────────────────────────────────
+
+    private void RefreshGameUi()
+    {
+        var project = _canvas.Project;
+
+        // Premium tier label
+        if (_premiumTierLabel is not null)
+        {
+            _premiumTierLabel.Text = $"Current tier: {PremiumStore.State.TierDisplayName}";
+        }
+
+        // CAMP Score
+        var score = CampScoreEngine.Calculate(project);
+
+        if (_campGradeLabel is not null)
+        {
+            _campGradeLabel.Text = score.Total > 0 ? score.Grade : "–";
+            _campGradeLabel.ForeColor = score.Total > 0 ? score.GradeColor : TextSecondary;
+        }
+
+        if (_campScoreLabel is not null)
+        {
+            if (score.Total > 0)
+            {
+                _campScoreLabel.Text =
+                    $"Score: {score.Total} / 1000\n" +
+                    $"Budget: {score.BudgetEfficiency}/250  Defense: {score.DefenseCoverage}/250\n" +
+                    $"Power: {score.PowerNetwork}/200  Flow: {score.VisitorFlow}/200  Aesthetics: {score.Aesthetics}/100";
+            }
+            else
+            {
+                _campScoreLabel.Text = "Place items to generate a CAMP Score.";
+            }
+        }
+
+        // Budget ring
+        var placedBudget = project.Items.Sum(x =>
+            Catalog.ById.TryGetValue(x.DefinitionId, out var d) ? d.BudgetCost : 0);
+        _budgetRingUsed = placedBudget + project.StoredBudget;
+        _budgetRingTotal = Math.Max(1, project.BudgetLimit);
+        _budgetRingPanel?.Invalidate();
+
+        // Next Action hint
+        if (_nextActionLabel is not null)
+        {
+            _nextActionLabel.Text = GenerateNextAction(project, score);
+        }
+
+        // Challenges
+        RefreshChallengeUi();
+
+        // Score status bar (bottom strip, right-aligned)
+        _scoreStatusLabel.Text = score.Total > 0
+            ? $"CAMP Score: {score.Total}/1000  |  Grade: {score.Grade}  |  Budget: {_budgetRingUsed}/{_budgetRingTotal}"
+            : string.Empty;
+
+        // Achievements: evaluate and check for new unlocks
+        var newlyUnlocked = AchievementEngine.EvaluateAndPersist(project);
+        if (newlyUnlocked.Count > 0)
+        {
+            var names = newlyUnlocked
+                .Select(id => AchievementLibrary.All.FirstOrDefault(a => a.Id == id)?.Name ?? id.ToString())
+                .ToList();
+            var msg = $"Achievement unlocked: {string.Join(", ", names)}!";
+            _statusLabel.Text = msg;
+            ShowToast(msg);
+        }
+
+        RefreshAchievementStripUi();
+    }
+
+    private void RefreshChallengeUi()
+    {
+        if (_activeChallenge is null || _activeChallengeLabel is null || _challengeConstraintLabel is null)
+        {
+            if (_activeChallengeLabel is not null)
+            {
+                _activeChallengeLabel.Text = "Select a challenge above.";
+            }
+
+            if (_challengeConstraintLabel is not null)
+            {
+                _challengeConstraintLabel.Text = string.Empty;
+            }
+
+            return;
+        }
+
+        var project = _canvas.Project;
+        var isAccessible = PremiumStore.State.Has(_activeChallenge.RequiredTier);
+        if (!isAccessible)
+        {
+            _activeChallengeLabel.Text = $"[{_activeChallenge.RequiredTier} required] {_activeChallenge.Description}";
+            _activeChallengeLabel.ForeColor = Color.FromArgb(160, 100, 60);
+            _challengeConstraintLabel.Text = "Upgrade to unlock this challenge.";
+            return;
+        }
+
+        var results = ChallengeEngine.Evaluate(_activeChallenge, project);
+        var metCount = results.Count(r => r.IsMet);
+        var isComplete = metCount == results.Count;
+
+        _activeChallengeLabel.Text = _activeChallenge.Description;
+        _activeChallengeLabel.ForeColor = isComplete ? StatusOk : TextSecondary;
+
+        var sb = new System.Text.StringBuilder();
+        foreach (var r in results)
+        {
+            sb.AppendLine($"{(r.IsMet ? "✔" : "○")} {r.Description}");
+        }
+
+        _challengeConstraintLabel.Text = sb.ToString().TrimEnd();
+        _challengeConstraintLabel.ForeColor = TextSecondary;
+    }
+
+    private void RefreshAchievementStripUi()
+    {
+        if (_achievementStripLabel is null) return;
+
+        var unlocked = AchievementLibrary.All
+            .Where(a => PremiumStore.IsUnlocked(a.Id))
+            .ToList();
+
+        if (unlocked.Count == 0)
+        {
+            _achievementStripLabel.Text = "No achievements unlocked yet.";
+            return;
+        }
+
+        var icons = unlocked.Select(a => $"{a.Icon} {a.Name}");
+        _achievementStripLabel.Text = string.Join("\n", icons);
+    }
+
+    private void PopulateChallengeCombo()
+    {
+        if (_challengeCombo is null) return;
+
+        _challengeCombo.Items.Clear();
+        foreach (var challenge in ChallengeLibrary.All)
+        {
+            _challengeCombo.Items.Add(challenge);
+        }
+
+        _challengeCombo.DisplayMember = nameof(ChallengeDefinition.DisplayName);
+        if (_challengeCombo.Items.Count > 0)
+        {
+            _challengeCombo.SelectedIndex = 0;
+        }
+    }
+
+    private static string GenerateNextAction(PlannerProject project, CampScore score)
+    {
+        var items = project.Items;
+
+        if (items.Count == 0)
+        {
+            return "Start by placing Foundation cells — use the Foundation tool and click the canvas.";
+        }
+
+        var hasFoundation = items.Any(x => string.Equals(x.DefinitionId, "foundation", StringComparison.Ordinal));
+        if (!hasFoundation)
+        {
+            return "Place at least one Foundation cell before adding other objects.";
+        }
+
+        var hasPower = items.Any(x =>
+            Catalog.ById.TryGetValue(x.DefinitionId, out var d) && d.Layer == LayerType.Power);
+        if (!hasPower)
+        {
+            return "No power sources detected — place a Power item to connect your build.";
+        }
+
+        var hasTurret = items.Any(x => string.Equals(x.DefinitionId, "turret", StringComparison.Ordinal));
+        if (!hasTurret)
+        {
+            return "Defense gap: no turrets placed. Add at least 2 turrets to cover main approach.";
+        }
+
+        var hasIngress = project.VisitorMarkers.Any(m => m.Type == VisitorMarkerType.Ingress);
+        if (!hasIngress)
+        {
+            return "Visitor flow undefined — add an Ingress marker to guide visitors.";
+        }
+
+        if (score.Aesthetics < 40)
+        {
+            return "Low aesthetics score — add Decor, Display, or Vendor items to improve presentation.";
+        }
+
+        if (score.Grade == "S")
+        {
+            return "Outstanding build! Grade S — your CAMP is ready for the wasteland.";
+        }
+
+        return $"Looking good! Current score {score.Total}/1000 (Grade {score.Grade}). Keep refining to reach A or S rank.";
+    }
+
+    private void PaintBudgetRing(object? sender, PaintEventArgs e)
+    {
+        if (_budgetRingPanel is null) return;
+
+        var g = e.Graphics;
+        g.SmoothingMode = System.Drawing.Drawing2D.SmoothingMode.AntiAlias;
+
+        const int cx = 54;
+        const int cy = 54;
+        const int radius = 44;
+        const int thickness = 12;
+        var rect = new Rectangle(cx - radius, cy - radius, radius * 2, radius * 2);
+
+        // Background ring
+        using var bgPen = new Pen(Color.FromArgb(50, 60, 74), thickness);
+        g.DrawArc(bgPen, rect, -90, 360);
+
+        // Used arc
+        var pct = Math.Max(0, Math.Min(1.0, (double)_budgetRingUsed / _budgetRingTotal));
+        var sweep = (float)(pct * 360);
+        var ringColor = pct switch
+        {
+            >= 1.0 => Color.FromArgb(224, 80, 80),     // over budget
+            >= 0.90 => Color.FromArgb(112, 211, 138),  // near cap — optimal
+            >= 0.60 => Color.FromArgb(246, 188, 57),   // mid
+            _       => Color.FromArgb(74, 144, 226)    // low usage
+        };
+
+        using var usedPen = new Pen(ringColor, thickness) { StartCap = System.Drawing.Drawing2D.LineCap.Round, EndCap = System.Drawing.Drawing2D.LineCap.Round };
+        if (sweep > 0f)
+        {
+            g.DrawArc(usedPen, rect, -90, sweep);
+        }
+
+        // Center text
+        var pctText = $"{(int)(pct * 100)}%";
+        using var centerFont = new Font("Segoe UI Semibold", 13f, FontStyle.Bold);
+        using var centerBrush = new SolidBrush(TextPrimary);
+        var textSize = g.MeasureString(pctText, centerFont);
+        g.DrawString(pctText, centerFont, centerBrush, cx - textSize.Width / 2, cy - textSize.Height / 2);
+
+        // Legend to the right
+        const int legendX = 122;
+        int legendY = 10;
+        using var smallFont = new Font("Segoe UI", 8.5f);
+        using var accentBrush = new SolidBrush(Accent);
+        using var subBrush = new SolidBrush(TextSecondary);
+
+        g.DrawString("Budget", smallFont, subBrush, legendX, legendY);
+        using var valueFont = new Font("Segoe UI Semibold", 10f, FontStyle.Bold);
+        g.DrawString($"{_budgetRingUsed} / {_budgetRingTotal}", valueFont, centerBrush, legendX, legendY + 18);
+
+        g.DrawString($"Placed: {_budgetRingUsed - _canvas.Project.StoredBudget}", smallFont, subBrush, legendX, legendY + 42);
+        g.DrawString($"Stored: {_canvas.Project.StoredBudget}", smallFont, subBrush, legendX, legendY + 58);
+        g.DrawString($"Limit:  {_budgetRingTotal}", smallFont, subBrush, legendX, legendY + 74);
+    }
 
     private void ApplyInspectorChanges()
     {
@@ -3992,6 +4512,7 @@ public sealed class MainForm : Form
         try
         {
             await _projectService.SaveAsync(_canvas.Project, path!).ConfigureAwait(false);
+            PremiumStore.IncrementSaves();
             _hasUnsavedChanges = false;
             if (InvokeRequired)
             {
@@ -4279,6 +4800,59 @@ public sealed class MainForm : Form
     {
         _hasUnsavedChanges = true;
         UpdateWindowTitle();
+    }
+
+    // ── Toast notifications ───────────────────────────────────────────────────
+
+    private void SetupToastPanel()
+    {
+        _toastLabel = new Label
+        {
+            AutoSize = false,
+            TextAlign = ContentAlignment.MiddleLeft,
+            ForeColor = Color.FromArgb(18, 22, 28),
+            BackColor = Color.FromArgb(246, 188, 57),
+            Font = new Font("Segoe UI Semibold", 9.5f, FontStyle.Bold),
+            Padding = new Padding(10, 0, 10, 0),
+            Dock = DockStyle.Fill,
+        };
+
+        _toastPanel = new Panel
+        {
+            Size = new Size(360, 44),
+            Visible = false,
+            BackColor = Color.FromArgb(246, 188, 57),
+        };
+        _toastPanel.Controls.Add(_toastLabel);
+
+        // Position bottom-right above status strip; anchor keeps it there on resize
+        _toastPanel.Anchor = AnchorStyles.Bottom | AnchorStyles.Right;
+        _toastPanel.Location = new Point(
+            ClientSize.Width - _toastPanel.Width - 12,
+            ClientSize.Height - _toastPanel.Height - 30);
+
+        Controls.Add(_toastPanel);
+        _toastPanel.BringToFront();
+
+        _toastTimer.Tick += (_, _) =>
+        {
+            _toastTimer.Stop();
+            _toastPanel!.Visible = false;
+        };
+    }
+
+    private void ShowToast(string message)
+    {
+        if (_toastPanel is null || _toastLabel is null) return;
+
+        _toastLabel.Text = message;
+        _toastPanel.Location = new Point(
+            ClientSize.Width - _toastPanel.Width - 12,
+            ClientSize.Height - _toastPanel.Height - 30);
+        _toastPanel.Visible = true;
+        _toastPanel.BringToFront();
+        _toastTimer.Stop();
+        _toastTimer.Start();
     }
 
     private sealed class ItemListEntry
